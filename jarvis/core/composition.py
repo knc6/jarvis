@@ -6,6 +6,7 @@ from collections import OrderedDict
 from collections import defaultdict
 from jarvis.core.utils import gcd
 import re
+import numpy as np
 
 
 class Composition(object):
@@ -30,8 +31,9 @@ class Composition(object):
         AB2 Li2O4 LiO2 77.8796
         """
         if sort:
-            content = OrderedDict(sorted(content.items(),
-                                  key=lambda x: (x[0])))
+            content = OrderedDict(
+                sorted(content.items(), key=lambda x: (x[0]))
+            )
         self._content = content
 
     @staticmethod
@@ -40,9 +42,9 @@ class Composition(object):
         re_formula = re.compile(r"([A-Z][a-z]?)([0-9\.]*)")
         d = defaultdict(float)
         for elt, amt in re_formula.findall(value):
-            if elt in ['D', 'T']:
-                elt = 'H'
-            if amt == '':
+            if elt in ["D", "T"]:
+                elt = "H"
+            if amt == "":
                 d[elt] = 1
             elif float(amt).is_integer():
                 d[elt] += int(float(amt))
@@ -83,6 +85,21 @@ class Composition(object):
         return self._content
 
     @property
+    def nspecies(self):
+        """Return number of species."""
+        return len(list(self.to_dict().keys()))
+
+    @property
+    def search_string(self):
+        """Return JARVIS sorted search string."""
+        return "-".join(sorted(list(self.to_dict().keys())))
+
+    @classmethod
+    def from_dict(self, d={}):
+        """Load the class from a dictionary."""
+        return Composition(content=d)
+
+    @property
     def reduced_formula(self):
         """Get reduced formula."""
         form = ""
@@ -105,6 +122,26 @@ class Composition(object):
             else:
                 form = form + str(specie) + str(count)
         return form.replace("1", "")
+
+    @property
+    def atomic_fraction(self):
+        """Get atomic fraction."""
+        comp_dict = self.to_dict()
+        tot = sum(comp_dict.values())
+        new_dict = OrderedDict()
+        for i, j in comp_dict.items():
+            new_dict[i] = j / tot
+        return new_dict
+
+    @property
+    def atomic_fraction_array(self):
+        """Get atomic fraction array."""
+        nelements = len(list(Specie()._data.keys()))
+        frac_arr = np.zeros(nelements)
+        fracs = self.atomic_fraction
+        for i, j in fracs.items():
+            frac_arr[int(Specie(i).Z) - 1] = j
+        return frac_arr
 
     @property
     def weight(self):

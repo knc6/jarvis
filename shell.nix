@@ -12,12 +12,16 @@ in
        joblib
        flask
        numpy
+       phonopy
        scipy
        matplotlib
        spglib
        requests
        toolz
        pytest
+       bokeh
+       networkx
+       xmltodict
      ];
      src=builtins.filterSource (path: type: type != "directory" || baseNameOf path != ".git") ./.;
      preShellHook = ''

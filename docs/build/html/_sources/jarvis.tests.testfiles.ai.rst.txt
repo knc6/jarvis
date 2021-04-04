@@ -4,6 +4,14 @@ jarvis.tests.testfiles.ai package
 Submodules
 ----------
 
+jarvis.tests.testfiles.ai.test\_ai\_uncertainty module
+------------------------------------------------------
+
+.. automodule:: jarvis.tests.testfiles.ai.test_ai_uncertainty
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 jarvis.tests.testfiles.ai.test\_desc module
 -------------------------------------------
 

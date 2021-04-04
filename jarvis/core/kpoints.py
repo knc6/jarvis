@@ -9,6 +9,7 @@ from jarvis.analysis.structure.spacegroup import Spacegroup3D
 from numpy import cos, sin
 from math import tan, pi
 from math import ceil
+import math
 
 
 def generate_kgrid(grid=[5, 5, 5]):
@@ -74,6 +75,18 @@ class Kpoints3D(object):
         """Return k-points arrays."""
         return self._kpoints
 
+    def kpoints_per_atom(self, atoms=None, kppa=1000):
+        """Return Kpoints object for kpoints per atom for a cell."""
+        if math.fabs((math.floor(kppa ** (1 / 3) + 0.5)) ** 3 - kppa) < 1:
+            kppa += kppa * 0.01
+        # latt = atoms.lattice_mat
+        lengths = atoms.lattice.lat_lengths()
+        ngrid = kppa / atoms.num_atoms
+        mult = (ngrid * lengths[0] * lengths[1] * lengths[2]) ** (1 / 3)
+        num_div = [int(math.floor(max(mult / lg, 1))) for lg in lengths]
+        kpts = Kpoints3D(kpoints=[num_div])
+        return kpts
+
     @property
     def labels(self):
         """Return k-points labels, used for high BZ points."""
@@ -120,11 +133,23 @@ class Kpoints3D(object):
     def to_dict(self):
         """Provide dictionary representation."""
         d = OrderedDict()
-        d["kpoints"] = self._kpoints
-        d["labels"] = self._labels
+        d["kpoints"] = list(np.array(self._kpoints).tolist())
+        d["labels"] = list(self._labels)
         d["kpoint_mode"] = self._kpoint_mode
         d["header"] = self._header
+        d["kpoints_weights"] = list(self._kp_weights)
         return d
+
+    @classmethod
+    def from_dict(self, d={}):
+        """Build class from a dictionary representation."""
+        return Kpoints3D(
+            kpoints=d["kpoints"],
+            labels=d["labels"],
+            kpoints_weights=d["kpoints_weights"],
+            kpoint_mode=d["kpoint_mode"],
+            header=d["header"],
+        )
 
     def high_symm_path(self, atoms):
         """Get high symmetry k-points for given Atoms."""
@@ -247,13 +272,15 @@ class Kpoints3D(object):
             kgamma = prim.angles[2]
             if kalpha > 90 and kbeta > 90 and kgamma > 90:
                 kp = HighSymmetryKpoint3DFactory().tria()
-            if kalpha < 90 and kbeta < 90 and kgamma < 90:
+            elif kalpha < 90 and kbeta < 90 and kgamma < 90:
                 kp = HighSymmetryKpoint3DFactory().trib()
-            if kalpha > 90 and kbeta > 90 and kgamma == 90:
+            elif kalpha > 90 and kbeta > 90 and kgamma == 90:
                 kp = HighSymmetryKpoint3DFactory().tria()
-            if kalpha < 90 and kbeta < 90 and kgamma == 90:
+            elif kalpha < 90 and kbeta < 90 and kgamma == 90:
                 kp = HighSymmetryKpoint3DFactory().trib()
-
+            else:
+                # Need to check
+                kp = HighSymmetryKpoint3DFactory().tria()
         else:
             print("kpath space group is not implemeted ", spg_symb)
         # print("kp",spg_symb)
@@ -261,7 +288,7 @@ class Kpoints3D(object):
 
     def high_kpath(self, atoms):
         """Get high symmetry path as a dictionary."""
-        return self.high_symm_path(atoms).as_dict()
+        return self.high_symm_path(atoms).to_dict()
 
     def interpolated_points(
         self, atoms, line_density=20, coords_are_cartesian=False
@@ -283,7 +310,9 @@ class Kpoints3D(object):
                     - self._prim_rec.cart_coords(end)
                 )
                 nb = int(ceil(distance * line_density))
-                print("nb", nb, distance, line_density)
+                if nb == 0:
+                    continue
+                # print("nb", nb, distance, line_density)
                 sym_point_labels.extend([b[i - 1]] + [""] * (nb - 1) + [b[i]])
                 list_k_points.extend(
                     [
@@ -387,7 +416,7 @@ class HighSymmetryKpoint3DFactory(object):
         path = [["\\Gamma", "H", "N", "\\Gamma", "P", "H"], ["P", "N"]]
         return HighSymmetryKpoint3DFactory(kpoints=kpoints, path=path)
 
-    def as_dict(self):
+    def to_dict(self):
         """Get dictionary representation."""
         d = OrderedDict()
         d["kpoints"] = self._kpoints

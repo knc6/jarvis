@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>jarvis.analysis.interface package &#8212; JARVIS-Tools v2020.7.4 documentation</title>
+    <title>jarvis.analysis.interface package &#8212; jarvis-tools v2021.2.3 documentation</title>
     <link rel="stylesheet" href="_static/classic.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
@@ -28,7 +28,7 @@
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">JARVIS-Tools v2020.7.4 documentation</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">jarvis-tools v2021.2.3 documentation</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -159,8 +159,8 @@ super lattice vectors.</dd>
 
 <dl class="function">
 <dt id="jarvis.analysis.interface.zur.get_hetero">
-<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">get_hetero</code><span class="sig-paren">(</span><em>film</em>, <em>substrate</em>, <em>seperation=3.0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#get_hetero"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.get_hetero" title="Permalink to this definition">¶</a></dt>
-<dd><p>Generate heterostructure.</p>
+<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">get_hetero</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#get_hetero"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.get_hetero" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate heterostructure. Deprecated also.</p>
 </dd></dl>
 
 <dl class="function">
@@ -171,15 +171,25 @@ super lattice vectors.</dd>
 
 <dl class="function">
 <dt id="jarvis.analysis.interface.zur.make_interface">
-<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">make_interface</code><span class="sig-paren">(</span><em>film=''</em>, <em>subs=''</em>, <em>atol=1</em>, <em>ltol=0.05</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#make_interface"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.make_interface" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return mismatch and other information as info dict.</p>
+<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">make_interface</code><span class="sig-paren">(</span><em>film=''</em>, <em>subs=''</em>, <em>atol=1</em>, <em>ltol=0.05</em>, <em>max_area=500</em>, <em>max_area_ratio_tol=1.0</em>, <em>seperation=3.0</em>, <em>vacuum=8.0</em>, <em>apply_strain=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#make_interface"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.make_interface" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use as main function for making interfaces/heterostructures.</p>
+<p>Return mismatch and other information as info dict.</p>
+<dl class="docutils">
+<dt>Args:</dt>
+<dd><p class="first">film: top/film material.</p>
+<p>subs: substrate/bottom/fixed material.</p>
+<p>seperation: minimum seperation between two.</p>
+<p class="last">vacuum: vacuum will be added on both sides.
+So 2*vacuum will be added.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="jarvis.analysis.interface.zur.mismatch_strts">
-<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">mismatch_strts</code><span class="sig-paren">(</span><em>film=[]</em>, <em>subs=[]</em>, <em>ltol=0.05</em>, <em>atol=10</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#mismatch_strts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.mismatch_strts" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">jarvis.analysis.interface.zur.</code><code class="descname">mismatch_strts</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/jarvis/analysis/interface/zur.html#mismatch_strts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#jarvis.analysis.interface.zur.mismatch_strts" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return mismatch and other information as info dict.</p>
-<p>Deprecated this module will be removes in the next version.</p>
+<p>Deprecated, preserved here so legacy imports work.</p>
 </dd></dl>
 
 <dl class="function">
@@ -273,11 +283,11 @@ super lattice vectors.</dd>
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">JARVIS-Tools v2020.7.4 documentation</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">jarvis-tools v2021.2.3 documentation</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2020, Kamal Choudhary.
+        &#169; Copyright 2021, Kamal Choudhary.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.1.
     </div>
   </body>

@@ -7,6 +7,8 @@ from jarvis.core.atoms import Atoms
 from collections import OrderedDict
 from jarvis.core.kpoints import generate_kgrid, Kpoints3D
 from jarvis.core.utils import get_counts
+from jarvis.core.specie import Specie
+from jarvis.core.utils import update_dict
 
 
 class Poscar(object):
@@ -31,6 +33,18 @@ class Poscar(object):
         """Read simple POSCAR file from the path."""
         with open(filename, "r") as f:
             return Poscar.from_string(f.read())
+
+    def to_dict(self):
+        """Convert Poscar object to a dictionary."""
+        d = OrderedDict()
+        d["atoms"] = self.atoms.to_dict()
+        d["comment"] = self.comment
+        return d
+
+    @classmethod
+    def from_dict(self, d={}):
+        """Construct Poscar object from a dictionary."""
+        return Poscar(atoms=Atoms.from_dict(d["atoms"]), comment=d["comment"])
 
     def write_file(self, filename):
         """Write the Poscar object to a file."""
@@ -59,6 +73,7 @@ class Poscar(object):
         )
         # order = np.argsort(self.atoms.elements)
         coords = self.atoms.frac_coords
+        # DO NOT USE ORDER
         coords_ordered = np.array(coords)  # [order]
         elements_ordered = np.array(self.atoms.elements)  # [order]
         props_ordered = np.array(self.atoms.props)  # [order]
@@ -204,7 +219,7 @@ class Incar(object):
                 self._tags[i] = j  # .strip(' ')
         for i, j in d.items():
             self._tags[i] = j
-        print("selftags2=", self._tags)
+        # print("selftags2=", self._tags)
         return Incar(self._tags)
 
     # def get(self, key="POTIM", temp=0.5):
@@ -220,6 +235,7 @@ class Incar(object):
         """Convert into dictionary."""
         return self._tags
 
+    @classmethod
     def from_dict(self, data={}):
         """Construct from dictionary."""
         return Incar(tags=data)
@@ -290,28 +306,49 @@ class Potcar(object):
         elements=[],
         pot_type="POT_GGA_PAW_PBE",
         pot_json_path="",
-        potcar_strings={},
+        potcar_strings=[],
     ):
-        """Initialize the Potcar class."""
+        """
+        Initialize the Potcar class.
+
+        POTCAR file contains the pseudopotential for each
+        atomic species used in the calculation.
+        Args:
+            elements: atomic elements.
+
+            pot_type: Type of pseudopotential.
+            Look for VASP provided PSPs.
+            VASP_PSP_DIR should be in the path.
+
+            pot_json_path: Path to dictionary of chemical elements along with
+            their orbitals taken into conisideration, e.g. V_pv.
+
+            potcar_strings: One can directly provide
+            the above mentioned strings.
+        """
         self._elements = elements
         self._pot_type = pot_type
         self._potcar_strings = potcar_strings
         self._pot_json_path = pot_json_path
 
-        if self._potcar_strings == {}:
+        if self._potcar_strings == []:
             pot_json_file = str(
                 os.path.join(os.path.dirname(__file__), "default_potcars.json")
             )
+            self._pot_json_path = pot_json_file
             pot_json = open(pot_json_file, "r")
             pot_json_selected = json.load(pot_json)
             pot_json.close()
-            potcar_strings = OrderedDict()
+            potcar_strings = []  # OrderedDict()
             for i in self._elements:
-                for j, k in pot_json_selected.items():
-                    if i == j:
-                        potcar_strings.setdefault(i, k)
+                potcar_strings.append(pot_json_selected[i])
+                # for j, k in pot_json_selected.items():
+                #    if i == j:
+                #        potcar_strings.setdefault(i, k)
             self._potcar_strings = potcar_strings
-            if len(self._elements) != len(self._potcar_strings.keys()):
+            #  print("self._elements", self._elements)
+            #  print("self._potcar_strings", self._potcar_strings)
+            if len(self._elements) != len(self._potcar_strings):
                 raise ValueError(
                     "Number of elements is not same as potcar_strings",
                     self._elements,
@@ -321,17 +358,33 @@ class Potcar(object):
             pot_json = open(self._pot_json_path, "r")
             pot_json_selected = json.load(pot_json)
             pot_json.close()
-            potcar_strings = OrderedDict()
-            for i, j in pot_json_selected.items():
-                if i in self._elements:
-                    potcar_strings.setdefault(i, j)
             self._potcar_strings = potcar_strings
-            if len(self._elements) != len(self._potcar_strings.keys()):
+            if len(self._elements) != len(self._potcar_strings):
                 msg = "Number of elements not same as potcar_strings"
                 raise ValueError(msg)
 
-    def catenate_potcar_files(self, destination_filename="POTCAR",
-                              filenames=[]):
+    @classmethod
+    def from_dict(self, d={}):
+        """Build class from a dictionary."""
+        return Potcar(
+            elements=d["elements"],
+            pot_type=d["pot_type"],
+            pot_json_path=d["pot_json_path"],
+            potcar_strings=d["potcar_strings"],
+        )
+
+    def to_dict(self):
+        """Convert to a dictionary."""
+        d = OrderedDict()
+        d["elements"] = np.array(self._elements).tolist()
+        d["pot_type"] = self._pot_type
+        d["pot_json_path"] = self._pot_json_path
+        d["potcar_strings"] = np.array(self._potcar_strings).tolist()
+        return d
+
+    def catenate_potcar_files(
+        self, destination_filename="POTCAR", filenames=[]
+    ):
         """Catenate potcars of sifferent elements."""
         with open(destination_filename, "w") as outfile:
             for fname in filenames:
@@ -342,10 +395,10 @@ class Potcar(object):
     def list_potcar_files(self):
         """List POTCAR files."""
         pot_files = []
-        vasp_dir = str(os.environ["JARVIS_VASP_PSP_DIR"])
+        vasp_dir = str(os.environ["VASP_PSP_DIR"])
         vasp_psp_dir = str(os.path.join(vasp_dir, self._pot_type))
         potcar_strings = self._potcar_strings
-        for i, j in potcar_strings.items():
+        for j in potcar_strings:
             tmp = os.path.join(vasp_psp_dir, j, "POTCAR")
             pot_files.append(tmp)
         return pot_files
@@ -353,8 +406,9 @@ class Potcar(object):
     def write_file(self, filename="POTCAR"):
         """Write POTCAR file."""
         pot_files = self.list_potcar_files()
-        self.catenate_potcar_files(destination_filename=filename,
-                                   filenames=pot_files)
+        self.catenate_potcar_files(
+            destination_filename=filename, filenames=pot_files
+        )
 
     def __repr__(self):
         """Represent Potcar."""
@@ -387,8 +441,8 @@ class Kpoints(object):
         """Read Kpoints as grid."""
         grid = [int(i) for i in lines[3].split()]
         kpts = generate_kgrid(grid)
-        kpoints = Kpoints3D(kpoints=np.array(kpts))
-        return kpoints
+        kpts_cls = Kpoints3D(kpoints=np.array(kpts))
+        return kpts_cls
 
     def get_ibz_kp(lines=""):
         """Read the Kpoints in the line-mode."""
@@ -414,22 +468,76 @@ class Kpoints(object):
         for i, j in zip(kp_labels, kp_labels_points):
             labels[j] = i
         all_kp = np.array(all_kp, dtype="float")
-        kpoints = Kpoints3D(kpoints=all_kp,
-                            labels=labels, kpoint_mode="linemode")
-        return kpoints
+        kpts_cls = Kpoints3D(
+            kpoints=all_kp, labels=labels, kpoint_mode="linemode"
+        )
+        return kpts_cls
 
 
-"""
-if __name__ == "__main__":
+def find_ldau_magmom(
+    atoms="",
+    default_magmom=True,
+    U=3.0,
+    mag=5.0,
+    amix=0.2,
+    bmix=0.00001,
+    amixmag=0.8,
+    bmixmag=0.00001,
+    lsorbit=False,
+):
+    """Get necessary INCAR tags for DFT+U calculations."""
+    sps = atoms.uniq_species
+    LDAUL = []
+    LDAUU = []
+    LDAUTYPE = 2
+    lmix = 4
+    for i in sps:
+        el = Specie(i)
+        el_u = 0
+        el_l = -1
+        if el.element_property("is_transition_metal"):
+            el_u = U
+            el_l = 2
+        if el.element_property("is_actinoid") or el.element_property(
+            "is_lanthanoid"
+        ):
+            el_u = U
+            el_l = 3
+            lmix = 6
+        LDAUL.append(el_l)
+        LDAUU.append(el_u)
+    if 3 in LDAUL:
+        LDAUTYPE = 3
+    nat = atoms.num_atoms
+    magmom = str(nat) + str("*") + str(mag)
+    if lsorbit:
+        magmom = ""
+        tmp = " 0 0 " + str(mag)
+        for i in range(0, nat):
+            magmom = magmom + tmp
+    info = {}
+    info["LDAU"] = ".TRUE."
+    info["LDAUTYPE"] = LDAUTYPE
+    info["LDAUL"] = " ".join(str(m) for m in LDAUL)
+    info["LDAUU"] = " ".join(str(m) for m in LDAUU)
+    info["LDAUPRINT"] = 2
+    info["LMAMIX"] = lmix
+    if not default_magmom:
+        info["MAGMOM"] = magmom
+    info["AMIX"] = amix
+    info["BMIX"] = bmix
+    info["AMIX_MAG"] = amixmag
+    info["BMIX_MAG"] = bmixmag
+    return info
 
-    kp = open(
-        "../../examples/vasp/SiOptb88/MAIN-RELAX-bulk@mp_149/KPOINTS", "r"
-    )  # .read_file()
-    lines = kp.read().splitlines()
-    kp.close()
-    print('lbl',Kpoints.read(lines).labels)
-    # print (kp.kpoints)
-    import sys
 
-    sys.exit()
-"""
+def add_ldau_incar(
+    use_incar_dict={}, atoms=None, Uval=2, lsorbit=False, default_magmom=True
+):
+    """Add LDAU in incase, especially made for spillage calcs."""
+    info_ldau = find_ldau_magmom(
+        U=Uval, atoms=atoms, lsorbit=lsorbit, default_magmom=default_magmom
+    )
+    tmp = update_dict(use_incar_dict, info_ldau)
+    use_incar_dict = tmp
+    return use_incar_dict

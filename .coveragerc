@@ -6,7 +6,7 @@ omit =
     #/usr/*
     # omit this single file
     #utils/tirefire.py
-    */mdcs_api.py
+    #*/mdcs_api.py
     */*lammps.py
     */*vasp.py
     */master.py
@@ -15,3 +15,5 @@ omit =
     */error*.py
     */job*.py
     */restapi*.py
+    */_xml*.py
+    tequila/*.py

@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+from collections import OrderedDict
 
 
 class Queue(object):
@@ -26,6 +27,28 @@ class Queue(object):
         """Select if run on the head node, not recommended."""
         os.system(submit_cmd)
 
+    def to_dict(self):
+        """Convert class to a dictionary."""
+        d = OrderedDict()
+        d["q_type"] = self.q_type
+        d["q_parameters"] = self.q_parameters
+        d["job_sub_cmd"] = self.job_sub_cmd
+        d["job_check_cmd"] = self.job_check_cmd
+        d["job_id"] = self.job_id
+        return d
+
+    @classmethod
+    def from_dict(self, d={}):
+        """Load from a dictionary."""
+        return Queue(
+            q_type=d["q_type"],
+            q_parameters=d["q_parameters"],
+            job_sub_cmd=d["job_sub_cmd"],
+            job_check_cmd=d["job_check_cmd"],
+            job_id=d["job_id"],
+        )
+
+    @classmethod
     def pbs(
         self,
         filename="submit_job",
@@ -60,9 +83,7 @@ class Queue(object):
             if isinstance(walltime, str):
                 f.write("#PBS -l walltime=%s\n" % walltime)
             else:
-                ValueError(
-                    "Plese provide walltime in a string format", walltime
-                )
+                ValueError("Provide walltime in a string format", walltime)
         if queue is not None:
             f.write("#PBS -q %s\n" % queue)
         if account is not None:
@@ -98,6 +119,7 @@ class Queue(object):
 
         print("x")
 
+    @classmethod
     def slurm(
         self,
         filename="submit_job",
@@ -124,15 +146,13 @@ class Queue(object):
         f = open(filename, "w")
         f.write("%s\n" % shell)
         f.write("#SBATCH --nodes=%d\n" % (nnodes))
-        f.write("SBATCH --ntasks-per-node=%d\n" % (cores))
+        f.write("#SBATCH --ntasks-per-node=%d\n" % (cores))
 
         if walltime is not None:
             if isinstance(walltime, str):
                 f.write("#SBATCH --time=%s\n" % walltime)
             else:
-                ValueError(
-                    "Plese provide walltime in a string format", walltime
-                )
+                ValueError("Provide walltime in a string format", walltime)
 
         if queue is not None:
             f.write("#SBATCH --partition=%s\n" % (queue))

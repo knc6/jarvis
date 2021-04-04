@@ -20,6 +20,22 @@ jarvis.core.composition module
     :undoc-members:
     :show-inheritance:
 
+jarvis.core.graphs module
+-------------------------
+
+.. automodule:: jarvis.core.graphs
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+jarvis.core.image module
+------------------------
+
+.. automodule:: jarvis.core.image
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 jarvis.core.kpoints module
 --------------------------
 
@@ -48,6 +64,14 @@ jarvis.core.specie module
 -------------------------
 
 .. automodule:: jarvis.core.specie
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+jarvis.core.spectrum module
+---------------------------
+
+.. automodule:: jarvis.core.spectrum
     :members:
     :undoc-members:
     :show-inheritance:

@@ -8,6 +8,7 @@ import numpy as np
 from numpy import sin, cos
 import itertools
 from fractions import gcd
+
 # from numpy import gcd
 # from math import gcd
 import os
@@ -34,8 +35,9 @@ def symmetrically_distinct_miller_indices(max_index=3, cvn_atoms=None):
     r = r3
     # print ('sorted',r,sorted(r))
     conv_hkl_list = [
-        miller for miller in
-        itertools.product(r, r, r) if any([i != 0 for i in miller])
+        miller
+        for miller in itertools.product(r, r, r)
+        if any([i != 0 for i in miller])
     ]
     spg = Spacegroup3D(cvn_atoms)._dataset
     rot = spg["rotations"]
@@ -183,8 +185,9 @@ class Spacegroup3D(object):
             self._atoms.atomic_numbers,
         )
         dataset = spglib.get_symmetry_dataset(
-            phonopy_atoms, symprec=self._symprec,
-            angle_tolerance=self._angle_tolerance
+            phonopy_atoms,
+            symprec=self._symprec,
+            angle_tolerance=self._angle_tolerance,
         )
         """
         keys = ('number',
@@ -319,8 +322,8 @@ class Spacegroup3D(object):
 
     @property
     def conventional_standard_structure(
-            self, tol=1e-5,
-            international_monoclinic=True):
+        self, tol=1e-5, international_monoclinic=True
+    ):
         """
         Give a conventional cell according to certain conventions.
 
@@ -354,8 +357,11 @@ class Spacegroup3D(object):
                 a, b = sorted(latt.abc[:2])
                 sorted_dic = sorted(
                     [
-                        {"vec": latt.matrix[i],
-                         "length": latt.abc[i], "orig_index": i}
+                        {
+                            "vec": latt.matrix[i],
+                            "length": latt.abc[i],
+                            "orig_index": i,
+                        }
                         for i in [0, 1]
                     ],
                     key=lambda k: k["length"],
@@ -370,8 +376,11 @@ class Spacegroup3D(object):
                 a, b = sorted(latt.abc[1:])
                 sorted_dic = sorted(
                     [
-                        {"vec": latt.matrix[i],
-                         "length": latt.abc[i], "orig_index": i}
+                        {
+                            "vec": latt.matrix[i],
+                            "length": latt.abc[i],
+                            "orig_index": i,
+                        }
                         for i in [1, 2]
                     ],
                     key=lambda k: k["length"],
@@ -427,8 +436,11 @@ class Spacegroup3D(object):
                 transf[2] = [0, 0, 1]
                 sorted_dic = sorted(
                     [
-                        {"vec": latt.matrix[i],
-                         "length": latt.abc[i], "orig_index": i}
+                        {
+                            "vec": latt.matrix[i],
+                            "length": latt.abc[i],
+                            "orig_index": i,
+                        }
                         for i in [0, 1]
                     ],
                     key=lambda k: k["length"],
@@ -462,6 +474,7 @@ class Spacegroup3D(object):
 
                     elif angles[0] < 90:
                         transf = np.zeros(shape=(3, 3))
+                        # print ('464-470')
                         transf[0][t[0]] = 1
                         transf[1][t[1]] = 1
                         transf[2][2] = 1
@@ -474,6 +487,7 @@ class Spacegroup3D(object):
                         ]
 
                 if new_matrix is None:
+                    # print ('479-482')
                     # this if is to treat the case
                     # where alpha==90 (but we still have a monoclinic sg
                     new_matrix = [[a, 0, 0], [0, b, 0], [0, 0, c]]
@@ -507,6 +521,7 @@ class Spacegroup3D(object):
                         ]
                         continue
                     elif alpha < 90 and b < c:
+                        # print ('510-515')
                         transf = np.zeros(shape=(3, 3))
                         transf[0][t[0]] = 1
                         transf[1][t[1]] = 1
@@ -518,6 +533,7 @@ class Spacegroup3D(object):
                             [0, c * cos(alpha), c * sin(alpha)],
                         ]
                 if new_matrix is None:
+                    # print ('523-530')
                     # this if is to treat the case
                     # where alpha==90 (but we still have a monoclinic sg
                     new_matrix = [
@@ -648,6 +664,44 @@ class Spacegroup3D(object):
             cartesian=False,
         )
         return new_struct
+
+
+def parse_xyz_string(xyz_string):
+    """
+    Convert xyz info to translation and rotation vectors.
+
+    Adapted from pymatgen.
+    Args:
+        xyz_string: string of the form 'x, y, z', '-x, -y, z',
+            '-2y+1/2, 3x+1/2, z-y+1/2', etc.
+    Returns:
+        translation and rotation vectors.
+    """
+    from jarvis.core.utils import parse_xyz_string
+
+    return parse_xyz_string(xyz_string)
+
+
+def operate_affine(cart_coord=[], affine_matrix=[]):
+    """Operate affine method."""
+    affine_point = np.array([cart_coord[0], cart_coord[1], cart_coord[2], 1])
+    return np.dot(np.array(affine_matrix), affine_point)[0:3]
+
+
+def get_new_coord_for_xyz_sym(frac_coord=[], xyz_string=""):
+    """Obtain new coord from xyz string."""
+    from jarvis.core.utils import get_new_coord_for_xyz_sym
+
+    return get_new_coord_for_xyz_sym(
+        frac_coord=frac_coord, xyz_string=xyz_string
+    )
+
+
+def check_duplicate_coords(coords=[], coord=[]):
+    """Check if a coordinate exists."""
+    from jarvis.core.utils import check_duplicate_coords
+
+    return check_duplicate_coords(coords=coords, coord=coord)
 
 
 """

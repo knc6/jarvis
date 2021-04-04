@@ -61,8 +61,10 @@ class Lattice(object):
 
     def lat_lengths(self):
         """Return lattice vectors' lengths."""
-        return [round(i, 6) for i in (
-                np.sqrt(np.sum(self._lat ** 2, axis=1)).tolist())]
+        return [
+            round(i, 6)
+            for i in (np.sqrt(np.sum(self._lat ** 2, axis=1)).tolist())
+        ]
         # return [round(np.linalg.norm(v), 6) for v in self._lat]
 
     @property
@@ -127,14 +129,20 @@ class Lattice(object):
                 angle = 90.0
             angles.append(angle)
         if radians:
-            angles = [round(angle * np.pi / 180.0, 4) for angle in angles]
+            angles = [round(angleX * np.pi / 180.0, 4) for angleX in angles]
         return angles
 
     @property
     def parameters(self):
         """Return lattice vector angles in radians or degree."""
-        return [self.a, self.b, self.c,
-                self.angles[0], self.angles[1], self.angles[2]]
+        return [
+            self.a,
+            self.b,
+            self.c,
+            self.angles[0],
+            self.angles[1],
+            self.angles[2],
+        ]
 
     @staticmethod
     def from_parameters(a, b, c, alpha, beta, gamma):
@@ -184,12 +192,13 @@ class Lattice(object):
         """Construct rhombohedral Lattice."""
         return Lattice.from_parameters(a, a, a, alpha, alpha, alpha)
 
-    def as_dict(self):
+    def to_dict(self):
         """Return lattice parameter information as a dictionary."""
         d = OrderedDict()
         d["matrix"] = self.matrix
         return d
 
+    @classmethod
     def from_dict(self, d):
         """Construct Lattice from lattice matrix dictionary."""
         return Lattice(lattice_mat=d["matrix"])
@@ -226,6 +235,10 @@ class Lattice(object):
         """Return reciprocal Lattice."""
         return Lattice(2 * np.pi * np.linalg.inv(self._lat).T)
 
+    def reciprocal_lattice_crystallographic(self):
+        """Return reciprocal Lattice without 2 * pi."""
+        return Lattice(self.reciprocal_lattice().matrix / (2 * np.pi))
+
     def get_points_in_sphere(self, frac_points, center, r):
         """
         Find all points within a sphere from the point.
@@ -235,7 +248,8 @@ class Lattice(object):
         Adapted from pymatgen.
         """
         recp_len = np.array(self.reciprocal_lattice().lat_lengths()) / (
-            2 * np.pi)
+            2 * np.pi
+        )
         nmax = float(r) * recp_len + 0.01
 
         # Get the fractional coordinates of the center of the sphere
@@ -302,8 +316,9 @@ class Lattice(object):
         ]
         c_a, c_b, c_c = (cart[i] for i in inds)
         f_a, f_b, f_c = (frac[i] for i in inds)
-        l_a, l_b, l_c = (np.sum(c ** 2, axis=-1)
-                         ** 0.5 for c in (c_a, c_b, c_c))
+        l_a, l_b, l_c = (
+            np.sum(c ** 2, axis=-1) ** 0.5 for c in (c_a, c_b, c_c)
+        )
 
         def get_angles(v1, v2, l1, l2):
             x = np.inner(v1, v2) / l1[:, None] / l2
@@ -346,7 +361,7 @@ class Lattice(object):
         This method returns a basis which is as "good" as
         possible, with "good" defined by orthongonality of the lattice vectors.
         This basis is used for all the periodic boundary condition calcs.
-        Adapted from pymatgen
+        Adapted from pymatgen.
 
         Args:
 
@@ -381,9 +396,10 @@ class Lattice(object):
                 if q != 0:
                     # Reduce the k-th basis vector.
                     a[:, k - 1] = a[:, k - 1] - q * a[:, i - 1]
-                    mapping[:, k - 1] = mapping[:, k - 1
-                                                ] - q * mapping[:, i - 1]
-                    uu = list(u[i - 1, 0: (i - 1)])
+                    mapping[:, k - 1] = (
+                        mapping[:, k - 1] - q * mapping[:, i - 1]
+                    )
+                    uu = list(u[i - 1, 0 : (i - 1)])
                     uu.append(1)
                     # Update the GS coefficients.
                     u[k - 1, 0:i] = u[k - 1, 0:i] - q * np.array(uu)
@@ -407,11 +423,11 @@ class Lattice(object):
 
                 # Update the Gram-Schmidt coefficients
                 for s in range(k - 1, k + 1):
-                    u[s - 1, 0: (s - 1)] = (
-                        dot(a[:, s - 1].T, b[:, 0: (s - 1)]) / m[0: (s - 1)]
+                    u[s - 1, 0 : (s - 1)] = (
+                        dot(a[:, s - 1].T, b[:, 0 : (s - 1)]) / m[0 : (s - 1)]
                     )
                     b[:, s - 1] = a[:, s - 1] - dot(
-                        b[:, 0: (s - 1)], u[s - 1, 0: (s - 1)].T
+                        b[:, 0 : (s - 1)], u[s - 1, 0 : (s - 1)].T
                     )
                     m[s - 1] = dot(b[:, s - 1], b[:, s - 1])
 
@@ -419,11 +435,12 @@ class Lattice(object):
                     k -= 1
                 else:
                     # We have to do p/q, so do lstsq(q.T, p.T).T instead.
-                    p = dot(a[:, k:3].T, b[:, (k - 2): k])
-                    q = np.diag(m[(k - 2): k])
-                    result = np.linalg.lstsq(q.T, p.T,
-                                             rcond=None)[0].T  # type: ignore
-                    u[k:3, (k - 2): k] = result
+                    p = dot(a[:, k:3].T, b[:, (k - 2) : k])
+                    q = np.diag(m[(k - 2) : k])
+                    result = np.linalg.lstsq(q.T, p.T, rcond=None)[
+                        0
+                    ].T  # type: ignore
+                    u[k:3, (k - 2) : k] = result
 
         return a.T, mapping.T
 
@@ -442,6 +459,17 @@ class Lattice(object):
         if delta not in self._lll_matrix_mappings:
             self._lll_matrix_mappings[delta] = self._calculate_lll()
         return Lattice(self._lll_matrix_mappings[delta][0])
+
+
+def lattice_coords_transformer(
+    old_lattice_mat=[], new_lattice_mat=[], cart_coords=[]
+):
+    """Transform coords to a new lattice."""
+    M = np.linalg.solve(new_lattice_mat, old_lattice_mat)
+    #  Maintains the z-distances - kfg
+    M[2, 2] = 1.0
+    new_cart_coords = np.dot(cart_coords, M)
+    return new_cart_coords
 
 
 """

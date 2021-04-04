@@ -3,6 +3,8 @@
 import os
 import json
 import shutil
+from collections import OrderedDict
+from jarvis.core.atoms import Atoms
 
 
 class Wannier90win(object):
@@ -73,6 +75,37 @@ class Wannier90win(object):
             f.close()
             self.semi_core_states = semi_core_states
 
+    def to_dict(self):
+        """Convert to a dictionary."""
+        d = OrderedDict()
+        d["struct"] = self.struct.to_dict()
+        d["efermi"] = self.efermi
+        d["soc"] = self.soc
+        d["dis_num_iter"] = self.dis_num_iter
+        d["dis_mix_ratio"] = self.dis_mix_ratio
+        d["num_iter"] = self.num_iter
+        d["num_print_cycles"] = self.num_print_cycles
+        d["frozen_tol"] = self.frozen_tol
+        d["semi_core_states"] = self.semi_core_states
+        d["kmesh_tol"] = self.kmesh_tol
+        return d
+
+    @classmethod
+    def from_dict(self, d={}):
+        """Convert class from a dictionary."""
+        return Wannier90win(
+            struct=Atoms.from_dict(d["struct"]),
+            efermi=d["efermi"],
+            soc=d["soc"],
+            dis_num_iter=d["dis_num_iter"],
+            dis_mix_ratio=d["dis_mix_ratio"],
+            num_iter=d["num_iter"],
+            num_print_cycles=d["num_print_cycles"],
+            frozen_tol=d["frozen_tol"],
+            semi_core_states=d["semi_core_states"],
+            kmesh_tol=d["kmesh_tol"],
+        )
+
     def write_win(self, name="win.input"):
         """Write .win file."""
         if self.soc:
@@ -120,11 +153,12 @@ class Wannier90win(object):
 
         tol = self.frozen_tol
         if self.efermi is not None:
-            dmax = self.efermi - tol
-            dmin = self.efermi + tol
+            dmax = self.efermi + tol
+            # dmin = self.efermi - tol
             line = str("dis_froz_max =") + str(dmax) + str("\n")
             f.write(line)
-            line = str("dis_froz_min =") + str(dmin) + str("\n")
+            line = str("dis_froz_min =") + str(-1000) + str("\n")
+            # line = str("dis_froz_min =") + str(dmin) + str("\n")
             f.write(line)
 
         line = str("dis_num_iter =") + str(self.dis_num_iter) + str("\n")
@@ -161,7 +195,7 @@ class Wannier90win(object):
         shutil.copy2(prev_win, bak)
 
         # line=str('write_hr=.true. \n')
-        line = str(hr_tag) + str(".true. \n")
+        line = str(hr_tag) + str("=.true. \n")
 
         f = open(hr, "w")
         f.write(line)

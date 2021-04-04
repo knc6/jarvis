@@ -4,6 +4,14 @@ jarvis.tests.testfiles.analysis.phonon package
 Submodules
 ----------
 
+jarvis.tests.testfiles.analysis.phonon.test\_fc module
+------------------------------------------------------
+
+.. automodule:: jarvis.tests.testfiles.analysis.phonon.test_fc
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 jarvis.tests.testfiles.analysis.phonon.test\_ir module
 ------------------------------------------------------
 

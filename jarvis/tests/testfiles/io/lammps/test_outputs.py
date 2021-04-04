@@ -1,5 +1,52 @@
 from jarvis.io.lammps.outputs import analyze_log
 import os
+from jarvis.io.lammps.outputs import parse_full_ff_folder
+import tarfile
+
+example_fold_tgz = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "examples",
+    "lammps",
+    "Al03.eam.alloy_nist.tgz",
+)
+
+
+example_fold = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "examples",
+    "lammps",
+    "Al03.eam.alloy_nist",
+)
+
+if not os.path.isdir(example_fold):
+    tar = tarfile.open(example_fold_tgz)
+    tar.extractall(example_fold)
+    tar.close()
+
+example_fold_run = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "examples",
+    "lammps",
+    "Al03.eam.alloy_nist",
+    "Al03.eam.alloy_nist",
+)
+def test_parse_full_ff_folder():
+ abspath=os.path.abspath(example_fold_run)
+ info = parse_full_ff_folder(abspath)
+ print (info)
+
 
 log_lammps = os.path.join(
     os.path.dirname(__file__),
@@ -9,6 +56,7 @@ log_lammps = os.path.join(
     "..",
     "examples",
     "lammps",
+    "Al03.eam.alloy_nist",
     "Al03.eam.alloy_nist",
     "bulk@mp-134_fold",
     "mp-134",
@@ -44,5 +92,5 @@ def test_outputs():
         -3.6,
     )
 
-
+test_parse_full_ff_folder()
 # test_outputs()
