@@ -22,28 +22,26 @@
         :target: https://pepy.tech/badge/jarvis-tools  
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3903515.svg
         :target: https://doi.org/10.5281/zenodo.3903515  
-.. image:: https://app.codacy.com/project/badge/Grade/be8fa78b1c0a49c280415ce061163e77    
-        :target: https://www.codacy.com/manual/knc6/jarvis?utm_source=github.com&amp
 .. image:: https://img.shields.io/github/commit-activity/y/usnistgov/jarvis   
         :target: https://github.com/usnistgov/jarvis
 .. image:: https://img.shields.io/github/repo-size/usnistgov/jarvis   
         :target: https://github.com/usnistgov/jarvis
 .. image:: https://img.shields.io/badge/JARVIS-Figshare-Green.svg  
-        :target: https://figshare.com/authors/Kamal_Choudhary/4445539
-.. image:: https://img.shields.io/badge/JARVIS-DBDocs-Green.svg  
-        :target: https://jarvis-materials-design.github.io/dbdocs   
+        :target: https://figshare.com/authors/Kamal_Choudhary/4445539   
 .. image:: https://img.shields.io/badge/JARVIS-ToolsDocs-Green.svg  
-        :target: https://jarvis-tools.readthedocs.io/en/latest/index.html 
+        :target: https://jarvis-tools.readthedocs.io 
+.. image:: https://colab.research.google.com/assets/colab-badge.svg
+       :target: https://github.com/JARVIS-Materials-Design/jarvis-tools-notebooks
 
 
 ========================================================================================
 
-JARVIS-Tools: an open-source software package for data-driven atomistic materials design
+JARVIS-Tools
 =========================================================================================
 
+The JARVIS-Tools is an open-access software package for atomistic data-driven materials design. JARVIS-Tools can be used for a) setting up calculations, b) analysis and informatics, c) plotting, d) database development and e) web-page development.
 
-NIST-JARVIS (Joint Automated Repository for Various Integrated Simulations) is an integrated framework for computational science using density functional theory,
-classical force-field/molecular dynamics and machine-learning. The jarvis-tools package consists of scripts used in generating and analyzing the dataset. The NIST-JARVIS official website is: https://jarvis.nist.gov . This project is a part of the Materials Genome Initiative (MGI) at NIST (https://mgi.nist.gov/). 
+JARVIS-Tools empowers NIST-JARVIS (Joint Automated Repository for Various Integrated Simulations) repository which is an integrated framework for computational science using density functional theory, classical force-field/molecular dynamics and machine-learning. The NIST-JARVIS official website is: https://jarvis.nist.gov . This project is a part of the Materials Genome Initiative (MGI) at NIST (https://mgi.nist.gov/). 
 
 For more details, checkout our latest article:  `The joint automated repository for various integrated simulations (JARVIS) for data-driven materials design <https://www.nature.com/articles/s41524-020-00440-1>`__ and `YouTube videos <https://www.youtube.com/watch?v=P0ZcHXOC6W0&feature=emb_title&ab_channel=JARVIS-repository>`__ 
 
@@ -51,10 +49,16 @@ For more details, checkout our latest article:  `The joint automated repository 
    :target: https://jarvis.nist.gov/
 
 
-Capabilities
-=======================================================================
+Documentation
+-----------------------------------------
 
-- **Software workflow tasks for preprcessing, executing and post-processing**:  VASP, Quantum Espresso, Wien2k BoltzTrap, Wannier90, LAMMPS, Scikit-learn, TensorFlow, LightGBM, Qiskit, Tequila, Pennylane.
+      https://jarvis-tools.readthedocs.io
+
+
+Capabilities
+-----------------------------------------
+
+- **Software workflow tasks for preprcessing, executing and post-processing**:  VASP, Quantum Espresso, Wien2k BoltzTrap, Wannier90, LAMMPS, Scikit-learn, TensorFlow, LightGBM, Qiskit, Tequila, Pennylane, DGL, PyTorch.
 
 - **Several examples**: Notebooks and test scripts to explain the package.
 
@@ -74,25 +78,34 @@ Capabilities
 Installation
 ---------------
 
->>> pip install -U jarvis-tools
+- We recommend installing miniconda environment from https://conda.io/miniconda.html ::
 
-or
+      bash Miniconda3-latest-Linux-x86_64.sh (for linux)
+      bash Miniconda3-latest-MacOSX-x86_64.sh (for Mac)
+      Download 32/64 bit python 3.9 miniconda exe and install (for windows)
+      Now, let's make a conda environment just for JARVIS::
+      conda create --name my_jarvis python=3.9
+      source activate my_jarvis
 
->>> conda install -c conda-forge jarvis-tools
+- Method-1: Installation using pip::
 
-For detailed instructions, please see `Installation instructions <https://github.com/usnistgov/jarvis/blob/master/Installation.rst>`__
+      pip install -U jarvis-tools
 
-**Do not** install like this:
+- Method-2: Installation using conda::
 
-.. |ss| raw:: html
+      conda install -c conda-forge jarvis-tools
 
-   <strike>
+- Method-3: Installation using setup.py::
 
-.. |se| raw:: html
+      pip install numpy scipy matplotlib
+      git clone https://github.com/usnistgov/jarvis.git
+      cd jarvis
+      python setup.py install
 
-   </strike>
-   
-|ss| pip install jarvis |se| 
+- Note on installing additional dependencies for all modules to function::
+
+      pip install -r dev-requirements.txt
+
 
 Example function
 -----------------
@@ -108,7 +121,7 @@ Example function
 >>> from jarvis.db.figshare import data
 >>> dft_3d = data(dataset='dft_3d')
 >>> print (len(dft_3d))
-36099
+55723
 >>> from jarvis.io.vasp.inputs import Poscar
 >>> for i in dft_3d:
 ...     atoms = Atoms.from_dict(i['atoms'])
@@ -118,7 +131,7 @@ Example function
 ...     poscar.write_file(filename)
 >>> dft_2d = data(dataset='dft_2d')
 >>> print (len(dft_2d))
-1070
+1079
 >>> for i in dft_2d:
 ...     atoms = Atoms.from_dict(i['atoms'])
 ...     poscar = Poscar(atoms)
@@ -143,6 +156,7 @@ Example function
 ...     s = Spectrum(x=ens,y=tot_dos_up)
 ...     interp = s.get_interpolated_values(new_dist=new_dist)
 ...     atoms=Atoms.from_dict(i['atoms'])
+...     ase_atoms=atoms.ase_converter()
 ...     all_dos_up.append(interp)
 ...     all_atoms.append(atoms)
 ...     all_jids.append(i['jid'])
@@ -157,26 +171,39 @@ Example function
 
 Find more examples at
 
-      1) https://jarvis-materials-design.github.io/dbdocs/tutorials
+      1) https://jarvis-tools.readthedocs.io/en/master/tutorials.html 
       
       2) https://github.com/JARVIS-Materials-Design/jarvis-tools-notebooks
       
       3) https://github.com/usnistgov/jarvis/tree/master/jarvis/tests/testfiles
       
+
+Citing
+--------------------
       
+Please cite the following if you happen to use JARVIS-Tools for a publication.
+
+https://www.nature.com/articles/s41524-020-00440-1
+
+    Choudhary, K. et al. The joint automated repository for various integrated simulations (JARVIS) for data-driven materials design. npj Computational Materials, 6(1), 1-13 (2020).
+
+
 References
 -----------------
 
-Please see `Publications related to JARVIS-Tools <https://jarvis-materials-design.github.io/dbdocs/publications/>`__
+Please see `Publications related to JARVIS-Tools <https://jarvis-tools.readthedocs.io/en/master/publications.html>`__
 
-Documentation
------------------------------------------
-      https://jarvis-materials-design.github.io/dbdocs/
+How to contribute
+-----------------
 
+.. image:: https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square
+        :target: http://makeapullrequest.com
 
+For detailed instructions, please see `Contribution instructions <https://github.com/usnistgov/jarvis/blob/master/Contribution.rst>`__
 
 Correspondence
 --------------------
+
 Please report bugs as Github issues (https://github.com/usnistgov/jarvis/issues) or email to kamal.choudhary@nist.gov.
 
 Funding support

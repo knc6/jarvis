@@ -25,7 +25,8 @@ def read_band_energy(
             if eig_bands != []:
                 eigs.append(np.array(eig_bands))
             eig_bands = []
-    eigs = np.array(eigs)
+    # print('eigs',eigs)
+    # eigs = np.array(eigs)
     if plot:
         for ii, i in enumerate(eigs):
             plt.plot([ii for j in range(len(i))], i, ".", c="b")
@@ -81,16 +82,19 @@ def band_eigvals(energy_file="FeSe.energy", plot=False, band_file="band.png"):
         if len(sp) == 2 and start:
             tmp = float(sp[1])
             eig_bands.append(tmp)
-        if len(sp) == 7:
+        if len(sp) > 2:
+            # if len(sp) == 7:
             start = True
             if eig_bands != []:
                 eigs.append(eig_bands)
             eig_bands = []
-    eigs = np.array(eigs)
+    # eigs = np.array(eigs)
+    print("TODO:Fix bug in np.array())")
     if plot:
         import matplotlib.pyplot as plt
 
-        for i in eigs.T:
+        for i in eigs:
+            # for i in eigs.T:
             plt.plot(i)
         plt.savefig(band_file)
         plt.close()

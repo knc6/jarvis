@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 from jarvis.core.utils import rec_dict
 from jarvis.core.utils import recast_array_on_uniq_array_elements
 import scipy.signal as ss
+from jarvis.core.utils import chunks
+from jarvis.core.utils import volumetric_grid_reshape
 
 RYTOEV = 13.605826
 AUTOA = 0.529177249
@@ -34,6 +36,7 @@ class Chgcar(object):
         augdiff=None,
         dim=None,
         nsets=1,
+        lines="",
     ):
         """
         Contain CHGCAR data.
@@ -63,8 +66,19 @@ class Chgcar(object):
         self.aug = aug
         self.augdiff = augdiff
         self.nsets = nsets
+        self.lines = lines
         if self.atoms is None:
-            self.read_file()
+            if self.filename != "":
+                f = open(self.filename, "r")
+                lines = f.read()
+                chg = self.read_file(lines=lines)
+                self.chg = chg
+                f.close()
+            elif self.lines != "":
+                chg = self.read_file(lines=self.lines)
+                self.chg = chg
+            else:
+                raise ValueError("Check inputs.")
 
     def to_dict(self):
         """Convert to a dictionary."""
@@ -115,11 +129,40 @@ class Chgcar(object):
         else:
             return False
 
-    def read_file(self):
+    def modify_grid(
+        self,
+        chg_set=0,
+        multiply_volume=True,
+        final_grid=[50, 50, 50],
+        write_file=True,
+        filename="New_CHGCAR",
+    ):
+        """Modify grid and Write a charge set to a file for visualization."""
+        chg = self.chg[chg_set]
+        if multiply_volume:
+            chg = np.array(chg) * self.atoms.volume
+        else:
+            chg = np.array(chg)
+        if final_grid is not None:
+            chg = volumetric_grid_reshape(chg, final_grid=final_grid)
+        if write_file:
+            with open(filename, "w") as f:
+                string_pos = Poscar(self.atoms).to_string()
+                f.write(string_pos)
+                f.write("\n")
+                f.write("  %d %d %d\n" % tuple(chg.shape))
+                # TODO: Write in fortran format
+                chnk_chg = chunks(chg.flatten(), 5)
+                for i in chnk_chg:
+                    line = " " + " ".join(map(str, i)) + "\n"
+                    f.write(line)
+        return chg
+
+    def read_file(self, lines=""):
         """Read CHGCAR."""
-        f = open(self.filename, "r")
-        lines = f.read()
-        f.close()
+        # f = open(self.filename, "r")
+        # lines = f.read()
+        # f.close()
         self.atoms = Poscar.from_string(lines).atoms
         volume = self.atoms.volume
         text = lines.splitlines()
@@ -143,18 +186,26 @@ class Chgcar(object):
         else:
             nlines = int(ngs / 5.0) + 1
         end = nlines + start  # +1
-
+        chg_arr = []
         for ii, i in enumerate(text):
             if text[ii] == ng_line:
                 start = ii + 1
                 end = start + nlines
                 chg = self.chg_set(text, start, end, volume, ng)
-                self.chg.append(chg)
-        self.chg = np.array(self.chg)
+                chg_arr.append(chg)
+        chg = np.array(chg_arr)
+        # self.chg = chg
+        return chg
 
     def chg_set(self, text, start, end, volume, ng):
         """Return CHGCAR sets."""
         lines_0 = text[start:end]
+        # tmp = np.empty((ng))
+        # p = np.fromstring('\n'.join(lines_0),  sep=' ')
+        # for zz in range(tmp.shape[2]):
+        # for yy in range(tmp.shape[1]):
+        #    tmp[:,yy,zz] = np.fromstring(p,  sep=' ',count=tmp.shape[0])
+        #    print(np.fromstring(p,  sep=' ',count=tmp.shape[0]))
         tmp = []
         for i in lines_0:
             for j in i.split():
@@ -169,74 +220,184 @@ class Locpot(Chgcar):
     """Read LOCPOT files."""
 
     def vac_potential(
-        self, direction="X", Ef=0, filename="Avg.png", plot=True
+        self,
+        direction="X",
+        Ef=0,
+        cbm=0,
+        vbm=0,
+        filename="Avg.png",
+        use_ase=False,
+        plot=True,
     ):
         """Calculate vacuum potential used in work-function calculation."""
+        if use_ase:
+            from ase.calculators.vasp import VaspChargeDensity
+
+            locd = VaspChargeDensity(self.filename)
+            cell = locd.atoms[0].cell
+            latlens = np.linalg.norm(cell, axis=1)
+            vol = np.linalg.det(cell)
+            iaxis = ["x", "y", "z"].index(direction.lower())
+            axes = [0, 1, 2]
+            axes.remove(iaxis)
+            axes = tuple(axes)
+            locpot = locd.chg[0]
+            mean = np.mean(locpot, axes) * vol
+            xvals = np.linspace(0, latlens[iaxis], locpot.shape[iaxis])
+            mean -= Ef
+            avg_max = max(mean)
+            dif = float(avg_max) - float(Ef)
+            if plot:
+                plt.xlabel("Distance(A)")
+                plt.plot(xvals, mean, "-", linewidth=2, markersize=10)
+                horiz_line_data = np.array(
+                    [avg_max for i in range(len(xvals))]
+                )
+                plt.plot(xvals, horiz_line_data, "-")
+                horiz_line_data = np.array([Ef for i in range(len(xvals))])
+                plt.plot(xvals, horiz_line_data, "-")
+                plt.ylabel("Potential (eV)")
+                ax = plt.gca()
+                ax.get_yaxis().get_major_formatter().set_useOffset(False)
+                plt.title(
+                    str("Energy diff. ")
+                    + str(round(float(dif), 3))
+                    + str(" eV"),
+                    fontsize=16,
+                )
+                plt.grid(color="gray", ls="-.")
+                plt.minorticks_on()
+                plt.tight_layout()
+
+                plt.savefig(filename)
+                plt.close()
+
+            return xvals, mean
+
         atoms = self.atoms
+        vol = atoms.volume
         cell = atoms.lattice_mat
-        chg = (self.chg[-1].T) * atoms.volume
-        latticelength = np.dot(cell, cell.T).diagonal()
-        latticelength = latticelength ** 0.5
-        ngridpts = np.array(chg.shape)
-        # totgridpts = ngridpts.prod()
-
-        if direction == "X":
-            idir = 0
-            a = 1
-            b = 2
-        elif direction == "Y":
-            a = 0
-            idir = 1
-            b = 2
+        chg = self.chg  # (self.chg[-1]) * atoms.volume
+        latlens = np.linalg.norm(cell, axis=1)
+        iaxis = ["x", "y", "z"].index(direction.lower())
+        formula = atoms.composition.reduced_formula
+        p = chg[0]
+        ng = [p.shape[2], p.shape[0], p.shape[1]]
+        p = p.flatten().reshape(ng)
+        if iaxis == "z":
+            axes = (1, 2)
+        elif iaxis == "y":
+            # TODO: test
+            axes = (0, 1)
         else:
-            a = 0
-            b = 1
-            idir = 2
-        a = (idir + 1) % 3
-        b = (idir + 2) % 3
-        average = np.zeros(ngridpts[idir], np.float)
-        for ipt in range(ngridpts[idir]):
-            if direction == "X":
-                average[ipt] = chg[ipt, :, :].sum()
-            elif direction == "Y":
-                average[ipt] = chg[:, ipt, :].sum()
-            else:
-                average[ipt] = chg[:, :, ipt].sum()
-        average /= ngridpts[a] * ngridpts[b]
-        xdiff = latticelength[idir] / float(ngridpts[idir] - 1)
-        xs = []
-        ys = []
-        for i in range(ngridpts[idir]):
-            x = i * xdiff
-            xs.append(x)
-            ys.append(average[i])
+            # TODO: test
+            axes = (0, 2)
+        axes = (1, 2)
+        mean = np.mean(p, axes) * vol
+        xvals = np.linspace(0, latlens[iaxis], p.shape[0])
+        mean -= Ef
+        avg_max = max(mean)
+        plt.plot(xvals, mean)
+        horiz_line_data = np.array([avg_max for i in range(len(xvals))])
+        plt.plot(xvals, horiz_line_data, "-")
+        horiz_line_data = np.array([Ef for i in range(len(xvals))])
+        plt.plot(xvals, horiz_line_data, "-")
+        plt.ylabel("Potential (eV)")
+        dif = float(avg_max)  # - float(efermi)
+        # vac_level = avg_max
+        cbm = cbm  # - vac_level
+        vbm = vbm  # - vac_level
+        plt.title(
+            str("WF,CBM,VBM ")
+            + str(round(float(dif), 3))
+            + ","
+            + str(round(cbm, 2))
+            + ","
+            + str(round(vbm, 2))
+            + str(" eV"),
+            fontsize=16,
+        )
+        plt.xlabel("z (Angstrom)")
+        plt.savefig(filename)
+        plt.close()
 
-        avg_max = max(average)
+        # old
+        # chg = (self.chg[-1].T) * atoms.volume
+        # print("chg", chg.shape)
+        # direction = "X"
+        # iaxis = ["x", "y", "z"].index(direction.lower())
+        # axes = [0, 1, 2]
+        # axes.remove(iaxis)
+        # axes = tuple(axes)
+        # mean = np.mean(chg, axes)
+        # latlens = np.linalg.norm(cell, axis=1)
+        # xvals = np.linspace(0, latlens[iaxis], chg.shape[iaxis])
+        # mean -= Ef
+        # print("xvals", xvals)
+        # print("mean", mean)
 
-        dif = float(avg_max) - float(Ef)
-        if plt:
-            plt.xlabel("z (Angstrom)")
-            plt.plot(xs, ys, "-", linewidth=2, markersize=10)
-            horiz_line_data = np.array([avg_max for i in range(len(xs))])
-            plt.plot(xs, horiz_line_data, "-")
-            horiz_line_data = np.array([Ef for i in range(len(xs))])
-            plt.plot(xs, horiz_line_data, "-")
-            plt.ylabel("Potential (eV)")
-            ax = plt.gca()
-            ax.get_yaxis().get_major_formatter().set_useOffset(False)
-            plt.title(
-                str("Energy difference ")
-                + str(round(float(dif), 3))
-                + str(" eV"),
-                fontsize=26,
-            )
-            plt.tight_layout()
+        # latticelength = np.dot(cell, cell.T).diagonal()
+        # latticelength = latticelength**0.5
+        # ngridpts = np.array(chg.shape)
 
-            plt.savefig(filename)
-            plt.close()
+        # if direction == "X":
+        #    idir = 0
+        #    a = 1
+        #    b = 2
+        # elif direction == "Y":
+        #    a = 0
+        #    idir = 1
+        #    b = 2
+        # else:
+        #    a = 0
+        #    b = 1
+        #    idir = 2
+        # a = (idir + 1) % 3
+        # b = (idir + 2) % 3
+        # average = np.zeros(ngridpts[idir], dtype=float)
+        # print("average", average.shape)
+        # for ipt in range(ngridpts[idir]):
+        #    if direction == "X":
+        #        average[ipt] = chg[ipt, :, :].sum()
+        #    elif direction == "Y":
+        #        average[ipt] = chg[:, ipt, :].sum()
+        #    else:
+        #        average[ipt] = chg[:, :, ipt].sum()
+        # average /= ngridpts[a] * ngridpts[b]
+        # xdiff = latticelength[idir] / float(ngridpts[idir] - 1)
+        # xs = []
+        # ys = []
+        # for i in range(ngridpts[idir]):
+        #    x = i * xdiff
+        #    xs.append(x)
+        #    ys.append(average[i])
 
-        print("Ef,max,wf=", Ef, avg_max, dif)
-        return avg_max, dif
+        # avg_max = max(average)
+
+        # dif = float(avg_max) - float(Ef)
+        # if plt:
+        #    plt.xlabel("z (Angstrom)")
+        #    plt.plot(xs, ys, "-", linewidth=2, markersize=10)
+        #    horiz_line_data = np.array([avg_max for i in range(len(xs))])
+        #    plt.plot(xs, horiz_line_data, "-")
+        #    horiz_line_data = np.array([Ef for i in range(len(xs))])
+        #    plt.plot(xs, horiz_line_data, "-")
+        #    plt.ylabel("Potential (eV)")
+        #    ax = plt.gca()
+        #    ax.get_yaxis().get_major_formatter().set_useOffset(False)
+        #    plt.title(
+        #        str("Energy difference ")
+        #        + str(round(float(dif), 3))
+        #        + str(" eV"),
+        #        fontsize=26,
+        #    )
+        #    plt.tight_layout()
+
+        #    plt.savefig(filename)
+        #    plt.close()
+
+        # print("Ef,max,wf=", Ef, avg_max, dif)
+        return mean, cbm, vbm, avg_max, Ef, formula, atoms
 
 
 class Oszicar(object):
@@ -335,6 +496,14 @@ class Outcar(object):
                 return nbands
 
     @property
+    def nedos(self):
+        """Get number of dos points."""
+        for i in self.data:
+            if "NEDOS =" in i:
+                n_edos = int(i.split()[-7])
+                return n_edos
+
+    @property
     def efermi(self):
         """Get Fermi energy."""
         efermi = []
@@ -342,6 +511,81 @@ class Outcar(object):
             if "E-fermi :" in i:
                 efermi.append(float(i.split()[2]))
         return efermi[-1]
+
+    def all_structures(self, elements=[]):
+        """Get all structure snapshots."""
+        force_pattern = "TOTAL-FORCE (eV/Angst)"
+        if not elements:
+            try:
+                elements = Atoms.from_poscar(
+                    self.filename.replace("OUTCAR", "POSCAR")
+                ).elements
+            except Exception:
+                print("Check POSCAR exsist, or pass elements.")
+                pass
+        blocks = []
+        for ii, i in enumerate(self.data):
+            if "  free  energy   TOTEN  =" in i:
+                blocks.append(i)
+            if "  free  energy ML TOTEN  =" in i:
+                blocks.append(i)
+        nions = self.nions
+        atoms_array = []
+        energy_array = []
+        force_array = []
+        stress_array = []
+        for ii, i in enumerate(self.data):
+            if "in kB" in i:
+                stress = [
+                    float(j) for j in self.data[ii].split("in kB")[1].split()
+                ]
+                stress_array.append(stress)
+            if "VOLUME and BASIS-vectors are now :" in i:
+                tmp1 = [float(j) for j in self.data[ii + 5].split()]
+                tmp2 = [float(j) for j in self.data[ii + 6].split()]
+                tmp3 = [float(j) for j in self.data[ii + 7].split()]
+                lat_mat = [
+                    [tmp1[0], tmp1[1], tmp1[2]],
+                    [tmp2[0], tmp2[1], tmp2[2]],
+                    [tmp3[0], tmp3[1], tmp3[2]],
+                ]
+            if "  free  energy   TOTEN  =" in i:
+                energy = float(
+                    self.data[ii]
+                    .split("  free  energy   TOTEN  =")[1]
+                    .split("eV")[0]
+                )
+                energy_array.append(energy)
+            if "  free  energy ML TOTEN  =" in i:
+                energy = float(
+                    self.data[ii]
+                    .split("  free  energy   TOTEN  =")[1]
+                    .split("eV")[0]
+                )
+                energy_array.append(energy)
+
+            if force_pattern in i:
+                coords = []
+                forces = []
+                for j in range(nions):
+                    tmp = [float(k) for k in self.data[ii + 2 + j].split()]
+                    coords.append([tmp[0], tmp[1], tmp[2]])
+                    forces.append([tmp[3], tmp[4], tmp[5]])
+                    # print(tmp)
+                atoms = Atoms(
+                    lattice_mat=lat_mat,
+                    coords=coords,
+                    elements=elements,
+                    cartesian=True,
+                )
+
+                atoms_array.append(atoms)
+                force_array.append(forces)
+        if len(blocks) != len(atoms_array):
+            print(
+                "WARNING: check OUTCAR parser", len(blocks), len(atoms_array)
+            )
+        return atoms_array, energy_array, force_array, stress_array
 
     @property
     def all_band_energies(self):
@@ -546,6 +790,39 @@ class Outcar(object):
         total_piezo = np.array(total_piezo, dtype="float")
         return ionic_piezo, total_piezo
 
+    def freq_dielectric_tensor(self):
+        """Parse dielectric function."""
+        lines = self.data
+        # nedos = self.nedos
+        imag_data = []
+        real_data = []
+        found_real = 0
+        found_imag = 0
+        for ii, i in enumerate(lines):
+            if "frequency dependent      REAL DIELECTRIC FUNCTION" in i:
+                found_real = ii
+            if "frequency dependent IMAGINARY DIELECTRIC FUNCTION" in i:
+                found_imag = ii
+        for j in range(found_real + 3, len(lines)):
+            if "        " in lines[j + 1]:
+                break
+            if "4ORBIT" in lines[j + 1]:
+                break
+            tmp = lines[j].split()
+            if len(tmp) == 7:
+                real_data.append(tmp)
+        for j in range(found_imag + 3, len(lines)):
+            if "        " in lines[j + 1]:
+                break
+            if "4ORBIT" in lines[j + 1]:
+                break
+            tmp = lines[j].split()
+            if len(tmp) == 7:
+                imag_data.append(tmp)
+        imag_data = np.array(imag_data, dtype="float")
+        real_data = np.array(real_data, dtype="float")
+        return real_data, imag_data
+
     def elastic_props(self, atoms=None, vacuum=False):
         """
         Obtain elastic tensor and calculate related properties.
@@ -669,7 +946,6 @@ class Outcar(object):
         try:
             for i in lines:
                 if "cm-1" in i and "meV" in i:
-
                     mod = float(i.split()[-4])
                     if "f/i" in i:
                         mod = mod * -1
@@ -694,6 +970,7 @@ class Waveder(object):
     The WAVEDER contains the derivative of the orbitals with respect to k.
     """
 
+    # Use lower numpy version e.g. 1.23.5
     def __init__(self, filename, gamma_only=False):
         """Initialize with filename."""
         with open(filename, "rb") as fp:
@@ -892,12 +1169,15 @@ class Wavecar(object):
         # goto the start of the file and read the first record
         self._wfc.seek(0)
         self._recl, self._nspin, self._rtag = np.array(
-            np.fromfile(self._wfc, dtype=np.float, count=3), dtype=int
+            np.fromfile(self._wfc, dtype=float, count=3),
+            dtype=int
+            # np.fromfile(self._wfc, dtype=np.float, count=3), dtype=int
         )
         self._WFPrec = self.setWFPrec()
         # the second record
         self._wfc.seek(self._recl)
-        dump = np.fromfile(self._wfc, dtype=np.float, count=12)
+        dump = np.fromfile(self._wfc, dtype=float, count=12)
+        # dump = np.fromfile(self._wfc, dtype=np.float, count=12)
 
         self._nkpts = int(dump[0])  # No. of k-points
         self._nbands = int(dump[1])  # No. of bands
@@ -956,7 +1236,10 @@ class Wavecar(object):
                 rec = self.whereRec(ii + 1, jj + 1, 1) - 1
                 self._wfc.seek(rec * self._recl)
                 dump = np.fromfile(
-                    self._wfc, dtype=np.float, count=4 + 3 * self._nbands
+                    self._wfc,
+                    dtype=float,
+                    count=4 + 3 * self._nbands
+                    # self._wfc, dtype=np.float, count=4 + 3 * self._nbands
                 )
                 if ii == 0:
                     self._nplws[jj] = int(dump[0])
@@ -1044,9 +1327,12 @@ class Wavecar(object):
                 % (Gvec.shape[0], self._nplws[ikpt - 1], np.prod(self._ngrid))
             )
         else:
-            assert Gvec.shape[0] == self._nplws[ikpt - 1], (
-                "No. of planewaves not consistent! %d %d %d"
-                % (Gvec.shape[0], self._nplws[ikpt - 1], np.prod(self._ngrid))
+            assert (
+                Gvec.shape[0] == self._nplws[ikpt - 1]
+            ), "No. of planewaves not consistent! %d %d %d" % (
+                Gvec.shape[0],
+                self._nplws[ikpt - 1],
+                np.prod(self._ngrid),
             )
         self._gvec = np.asarray(Gvec, dtype=int)
 
@@ -1219,7 +1505,7 @@ class Vasprun(object):
             * np.sqrt(2.0)
             * eV_to_recip_cm
             * energies
-            * np.sqrt(-epsilon_1 + np.sqrt(epsilon_1 ** 2 + epsilon_2 ** 2))
+            * np.sqrt(-epsilon_1 + np.sqrt(epsilon_1**2 + epsilon_2**2))
         )
         return energies, absorption
 
@@ -1240,7 +1526,7 @@ class Vasprun(object):
                     i * 3 : (i + 1) * 3, j * 3 : (j + 1) * 3
                 ]
         masses = [Specie(i).atomic_mass for i in struct.elements]
-        print("Vasp masses", masses)
+        # print("Vasp masses", masses)
         if fc_mass:
             for i in range(natoms):
                 for j in range(natoms):
@@ -1264,6 +1550,26 @@ class Vasprun(object):
         info["masses"] = masses
         info["force_constants"] = force_constants
         return info
+
+    @property
+    def converged_electronic(self):
+        """Check whether electronically converged."""
+        return len(self.ionic_steps[-1]["scstep"]) <= int(
+            self.all_input_parameters["NELM"]
+        )
+
+    @property
+    def converged_ionic(self):
+        """Check whether ionically converged."""
+        nsw = int(self.all_input_parameters["NSW"])
+        if nsw == 0:
+            nsw = 1
+        return len(self.ionic_steps) <= nsw
+
+    @property
+    def converged(self):
+        """Check whether both electronically and ionically converged."""
+        return self.converged_electronic and self.converged_ionic
 
     @property
     def dfpt_data(self, fc_mass=True):
@@ -1352,6 +1658,40 @@ class Vasprun(object):
             gap = min(cat[:, nelect]) - max(cat[:, nelect - 1])
         return gap, cbm, vbm
 
+    def bandgap_occupation_tol(self, occu_tol=0.1):
+        """Get bandgap based on occupation tolerance."""
+        eigs = np.concatenate(
+            (self.eigenvalues[0][:, :, 0], self.eigenvalues[1][:, :, 0]),
+            axis=1,
+        )
+        occs = np.concatenate(
+            (self.eigenvalues[0][:, :, 1], self.eigenvalues[1][:, :, 1]),
+            axis=1,
+        )
+
+        vbm = -np.inf
+        vbm_kpoint = None
+        cbm = np.inf
+        cbm_kpoint = None
+        k = 0
+        for i, j in zip(eigs, occs):
+            k += 1
+            for eigenval, occu in zip(i, j):
+                if occu > occu_tol and eigenval > vbm:
+                    vbm = eigenval
+                    vbm_kpoint = k
+                elif occu <= occu_tol and eigenval < cbm:
+                    cbm = eigenval
+                    cbm_kpoint = k
+        return (
+            max(cbm - vbm, 0),
+            cbm,
+            vbm,
+            vbm_kpoint,
+            cbm_kpoint,
+            vbm_kpoint == cbm_kpoint,
+        )
+
     @property
     def fermi_velocities(self):
         """Get fermi velocities in m/s."""
@@ -1405,9 +1745,16 @@ class Vasprun(object):
             raise ValueError("Unknown element type")
         if len(elements) != self.num_atoms:
             ValueError("Number of atoms is  not equal to number of elements")
-        elements = [str(i) for i in elements]
-        # print ('elements',elements)
-        return elements
+        final_elements = []
+        for i in elements:
+            el = str(i)
+            if el == "X":
+                el = "Xe"
+            if el == "r":
+                el = "Zr"
+            final_elements.append(el)
+
+        return final_elements
 
     def vrun_structure_to_atoms(self, s={}):
         """Convert structure to Atoms object."""
@@ -1522,9 +1869,15 @@ class Vasprun(object):
         """Get all forces."""
         forces = []
         for m in self.ionic_steps:
-            force = np.array(
-                [[float(j) for j in i.split()] for i in m["varray"][0]["v"]]
-            )
+            if self.all_structures[-1].num_atoms == 1:
+                force = np.array(m["varray"][0]["v"].split(), dtype="float")
+            else:
+                force = np.array(
+                    [
+                        [float(j) for j in i.split()]
+                        for i in m["varray"][0]["v"]
+                    ]
+                )
 
             forces.append(force)
         return np.array(forces)
@@ -1592,6 +1945,7 @@ class Vasprun(object):
         zero_efermi=True,
         kpoints_file_path="KPOINTS",
         plot=False,
+        filename=None,
     ):
         """Get electronic bandstructure plot."""
         try:
@@ -1618,6 +1972,10 @@ class Vasprun(object):
 
         tmp = 0.0
         info = {}
+        indir_gap = float(self.get_indir_gap[0])
+        print("gap=", indir_gap)
+        info["indir_gap"] = indir_gap
+
         info["efermi"] = float(self.efermi)
         if zero_efermi:
             tmp = float(self.efermi)
@@ -1667,6 +2025,9 @@ class Vasprun(object):
                 else r"$\mathrm{Energy\ (eV)}$"
             )
             plt.ylabel(ylabel)
+            if filename is not None:
+                plt.savefig(filename)
+                plt.close()
         return info
 
     @property
@@ -2022,7 +2383,6 @@ class Vasprun(object):
                 for i, j in info.items():
                     if "spin" in i:
                         for m, n in j.items():
-
                             if "up" in i:
                                 plt.plot(info["energy"], n, label=m)
                             if "down" in i:
@@ -2038,13 +2398,28 @@ def parse_raman_dat(
     Parse vasp_raman.dat .
 
     generated by https://github.com/raman-sc/VASP
+
+    Activities to Intensities: J. At. Mol. Sci. 3 (2012) 1-22
+    Intensity = const0 * (nu0-nu)**4/nu * 1/(1-exp(-h*c*nu/(kB*T))) * activity
+    Data for computing intensities, as in Materials Project's paper:
+      T=300K,
+      nu0=18796.9925 cm-1
     """
+    temp = 300.0
+    nu0 = 18796.9925
+    # hc = Plank's constant * speed of light
+    # hc_over_kB = h*c/Boltzman_constant
+    hc_over_kB = 1.4388003592  # cm/s
+    # A good, aritrary choice for const0 is 10**(-14)
+    const0 = 10 ** (-14)
+
     f = open(vasp_raman_path, "r")
     lines = f.read().splitlines()
     f.close()
     info = {}
     freqs = []
     activity = []
+    intensity = []
     alpha = []
     beta2 = []
     for i in lines:
@@ -2054,6 +2429,12 @@ def parse_raman_dat(
             alpha.append(float(tmp[2]))
             beta2.append(float(tmp[3]))
             activity.append(float(tmp[4]))
+            nu = float(tmp[1])
+            AA1 = const0 * (nu0 - nu) ** 4 / nu
+            exp1 = np.exp(-hc_over_kB * nu / temp)
+            AA2 = 1.0 / (1.0 - exp1)
+            intensita = AA1 * AA2 * float(tmp[4])
+            intensity.append(intensita)
     freqs = np.array(freqs)
     activity = np.array(activity)
     indices = np.arange(0, len(activity) - 1)
@@ -2067,11 +2448,5 @@ def parse_raman_dat(
     info["alpha"] = alpha
     info["beta2"] = beta2
     info["indices"] = indices
+    info["intensity"] = intensity
     return info
-
-
-"""
-kp='/users/knc6/Software/Devs/jarvis/jarvis/examples/vasp/SiOptb88/MAIN-RELAX-bulk@mp_149/KPOINT'
-kpt=Kpoints(filename=kp)
-print (kpt)
-"""

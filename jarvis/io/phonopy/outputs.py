@@ -9,9 +9,9 @@ from jarvis.io.phonopy.inputs import PhonopyInputs
 # from jarvis.io.wannier.outputs import WannierHam
 from jarvis.io.phonopy.fcmat2hr import get_phonon_hr
 
+# VaspToTHz = 15.633302300230191
 try:
     from phonopy import Phonopy
-    from phonopy.units import VaspToTHz
     from phonopy.structure.cells import determinant
     from phonopy.structure.cells import get_reduced_bases
 except Exception as exp:
@@ -88,11 +88,15 @@ def get_phonon_tb(
     out_file="phonopyTB_hr.dat",
     distance_to_A=1.0,
     scell=np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
-    factor=VaspToTHz,
+    factor=None,
     symprec=1e-05,
     displacement_distance=0.01,
 ):
     """Generate phonon TB Hamiltonia, along with WannierHamn."""
+    if factor is None:
+        from phonopy.units import VaspToCm
+
+        factor = VaspToCm
     # Forked from Wannier-tools
     unitcell = atoms.phonopy_converter()
     # unitcell = phonopy_atoms
@@ -113,7 +117,7 @@ def get_phonon_tb(
         force_constants_decimals=None,
         symprec=symprec,
         is_symmetry=True,
-        use_lapack_solver=False,
+        # use_lapack_solver=False,
         log_level=1,
     )
 
@@ -124,7 +128,7 @@ def get_phonon_tb(
     phonon._set_dynamical_matrix()
     dmat = phonon._dynamical_matrix
     # rescale fcmat by THZ**2
-    fcmat = dmat._force_constants * factor ** 2  # FORCE_CONSTANTS
+    fcmat = dmat._force_constants * factor**2  # FORCE_CONSTANTS
     # fcmat = dmat._force_constants * factor ** 2  # FORCE_CONSTANTS
     smallest_vectors = dmat._smallest_vectors
     # mass = dmat._mass

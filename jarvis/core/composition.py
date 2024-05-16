@@ -1,4 +1,5 @@
 """Modules handling chemical composition."""
+
 # from math import gcd
 import string
 from jarvis.core.specie import Specie
@@ -76,9 +77,36 @@ class Composition(object):
         reduced, repeat = self.reduce()
         N = 0
         for specie, count in reduced.items():
-            proto = proto + str(all_upper[N]) + str(round(count, 3))
-            N = N + 1
-        return proto.replace("1", "")
+            if count != 1:
+                proto = proto + str(all_upper[N]) + str(round(count, 3))
+                N = N + 1
+            else:
+                proto = proto + str(all_upper[N])
+                N = N + 1
+        return proto  # .replace("1", "")
+
+    @property
+    def prototype_new(self):
+        """Get chemical prototypes such as A, AB etc."""
+        proto = ""
+        all_upper = string.ascii_uppercase
+        # print('reduce',self.reduce())
+        reduced, repeat = self.reduce()
+        items = sorted(list(reduced.values()), reverse=True)
+        # print('items',items)
+        N = 0
+        for c in items:
+            if c == 1:
+                proto = proto + str(all_upper[N])
+                N = N + 1
+            else:
+                proto = proto + str(all_upper[N]) + str(round(c, 3))
+                N = N + 1
+
+        # for specie, count in reduced.items():
+        #    proto = proto + str(all_upper[N]) + str(round(count, 3))
+        #    N = N + 1
+        return proto  # .replace("1", "")
 
     def to_dict(self):
         """Return dictionary format."""
@@ -104,13 +132,23 @@ class Composition(object):
         """Get reduced formula."""
         form = ""
         reduced, repeat = self.reduce()
-        for specie, count in reduced.items():
+        X = {}
+        for i, j in reduced.items():
+            X[i] = Specie(i).X
+        Y = dict(sorted(X.items(), key=lambda item: item[1]))
+        Z = {}
+        for i, j in Y.items():
+            Z[i] = reduced[i]
+        for specie, count in Z.items():
             if float(count).is_integer():
-                form = form + specie + str(int(count))
+                if count == 1:
+                    form = form + specie
+                else:
+                    form = form + specie + str(int(count))
             else:
                 form = form + specie + str(count)
 
-        return form.replace("1", "")
+        return form  # .replace("1", "")
 
     @property
     def formula(self):

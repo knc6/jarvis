@@ -6,26 +6,36 @@ from setuptools import setup, find_packages
 JARVIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 base_dir = os.path.dirname(__file__)
-with open(os.path.join(base_dir, "README.rst")) as f:
+# with open(os.path.join(base_dir, "README.rst")) as f:
+with open(os.path.join(base_dir, "README.md")) as f:
     long_d = f.read()
 
 setup(
     name="jarvis-tools",
-    version="2021.3.13",
+    version="2024.4.30",
     long_description=long_d,
     install_requires=[
-        "numpy>=1.18.5",
-        "scipy>=1.4.1",
+        "numpy>=1.20.1",
+        "scipy>=1.5.0",
         "matplotlib>=3.0.0",
         "spglib>=1.14.1",
         "joblib>=0.14.1",
         "requests>=2.23.0",
         "toolz>=0.9.0",
         "xmltodict>=0.11.0",
-        "tqdm>=4.59.0",
+        "tqdm>=4.41.1",
+        # "mkdocs-material>=9.0.5",
+        # "markdown>=3.2.1",
+        # "absl-py==1.4.0",
     ],
     package_data={
-        "jarvis.core": ["Elements.json", "element_charge.json"],
+        "jarvis.core": [
+            "Elements.json",
+            "magpie.json",
+            "element_charge.json",
+            "atom_init.json",
+            "mineral_name_prototype.json.zip",
+        ],
         "jarvis.tasks.lammps.templates": [
             "displace.mod",
             "inelastcomb.mod",
@@ -38,6 +48,7 @@ setup(
         ],
         "jarvis.io.vasp": ["default_potcars.json"],
         "jarvis.analysis.solarefficiency": ["am1.5G.dat"],
+        "jarvis.analysis.thermodynamics": ["unary.json", "unary_qe_tb.json"],
         "jarvis.io.wannier": ["default_semicore.json"],
         "jarvis.analysis.diffraction": ["atomic_scattering_params.json"],
         "jarvis": ["LICENSE.rst"],
@@ -45,6 +56,7 @@ setup(
     extras_require={
         "ai": [
             "torch",
+            "dgl",
             "keras",
             "tensorflow",
             "scikit-learn",

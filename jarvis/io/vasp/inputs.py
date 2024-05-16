@@ -9,6 +9,8 @@ from jarvis.core.kpoints import generate_kgrid, Kpoints3D
 from jarvis.core.utils import get_counts
 from jarvis.core.specie import Specie
 from jarvis.core.utils import update_dict
+from jarvis.db.jsonutils import loadjson
+from collections import defaultdict
 
 
 class Poscar(object):
@@ -46,9 +48,8 @@ class Poscar(object):
         """Construct Poscar object from a dictionary."""
         return Poscar(atoms=Atoms.from_dict(d["atoms"]), comment=d["comment"])
 
-    def write_file(self, filename):
-        """Write the Poscar object to a file."""
-        f = open(filename, "w")
+    def to_string(self, write_props=False):
+        """Make the Poscar object to a string."""
         header = (
             str(self.comment)
             + str("\n1.0\n")
@@ -78,32 +79,71 @@ class Poscar(object):
         elements_ordered = np.array(self.atoms.elements)  # [order]
         props_ordered = np.array(self.atoms.props)  # [order]
         # check_selective_dynamics = False
-        counts = get_counts(elements_ordered)
-        if "T" in "".join(map(str, self.atoms.props[0])):
+        info = defaultdict(list)
+        for i, j, k in zip(elements_ordered, coords_ordered, props_ordered):
+            info[i].append([j, k])
+        elname = ""
+        elcount = ""
+        elcoords = ""
+        for i, j in info.items():
+            # print(i, len(j))
+            elname += i + " "
+            elcount += str(len(j)) + " "
+            for k in j:
+                if k[1] == "":
+                    elcoords += " ".join(map(str, k[0])) + " " + i + "\n"
+                elif isinstance(k[1], list):
+                    elcoords += (
+                        " ".join(map(str, k[0]))
+                        + " ".join(map(str, k[1]))
+                        + "\n"
+                    )
+                else:
+                    elcoords += " ".join(map(str, k[0])) + " " + k[1] + "\n"
+
+        if write_props and "T" in "".join(map(str, self.atoms.props[0])):
             middle = (
-                " ".join(map(str, counts.keys()))
-                + "\n"
-                + " ".join(map(str, counts.values()))
-                + "\nSelective dynamics\n"
-                + "Direct\n"
+                elname + "\n" + elcount + "\nSelective dynamics\n" + "Direct\n"
             )
         else:
-            middle = (
-                " ".join(map(str, counts.keys()))
-                + "\n"
-                + " ".join(map(str, counts.values()))
-                + "\ndirect\n"
-            )
-        rest = ""
+            middle = elname + "\n" + elcount + "\ndirect\n"
+        rest = elcoords
+
+        # counts = get_counts(elements_ordered)
+        # if "T" in "".join(map(str, self.atoms.props[0])):
+        #    middle = (
+        #        " ".join(map(str, counts.keys()))
+        #        + "\n"
+        #        + " ".join(map(str, counts.values()))
+        #        + "\nSelective dynamics\n"
+        #        + "Direct\n"
+        #    )
+        # else:
+        #    middle = (
+        #        " ".join(map(str, counts.keys()))
+        #        + "\n"
+        #        + " ".join(map(str, counts.values()))
+        #        + "\ndirect\n"
+        #    )
+        # rest = ""
         # print ('repr',self.frac_coords, self.frac_coords.shape)
-        for ii, i in enumerate(coords_ordered):
-            p_ordered = str(props_ordered[ii])
-            rest = rest + " ".join(map(str, i)) + " " + str(p_ordered) + "\n"
+        # for ii, i in enumerate(coords_ordered):
+        #    p_ordered = str(props_ordered[ii])
+        #    rest = (
+        #        rest + " ".join(map(str, i)) + " " + str(p_ordered) + "\n"
+        #    )
 
         result = header + middle + rest
 
-        f.write(result)
-        f.close()
+        return result
+
+    def write_file(self, filename):
+        """Write the Poscar object to a file."""
+        # TODO: Use to_string instead of re-writing the code here
+        with open(filename, "w") as f:
+            # f = open(filename, "w")
+            f.write(self.to_string())
+            # f.close()
 
     @staticmethod
     def from_string(lines):
@@ -116,7 +156,9 @@ class Poscar(object):
         lattice_mat.append([float(i) for i in text[3].split()])
         lattice_mat.append([float(i) for i in text[4].split()])
         lattice_mat = scale * np.array(lattice_mat)
-
+        begin = 5
+        if "S" in text[7] and "s" in text[7]:
+            begin = 6
         uniq_elements = text[5].split()
         element_count = np.array([int(i) for i in text[6].split()])
         elements = []
@@ -124,13 +166,12 @@ class Poscar(object):
             for j in range(ii):
                 elements.append(uniq_elements[i])
         cartesian = True
-        if "d" in text[7] or "D" in text[7]:
+        if "d" in text[begin + 2] or "D" in text[begin + 2]:
             cartesian = False
-        # print ('cartesian poscar=',cartesian,text[7])
         num_atoms = int(np.sum(element_count))
         coords = []
         for i in range(num_atoms):
-            coords.append([float(i) for i in text[8 + i].split()[0:3]])
+            coords.append([float(i) for i in text[begin + 3 + i].split()[0:3]])
         coords = np.array(coords)
         atoms = Atoms(
             lattice_mat=lattice_mat,
@@ -363,6 +404,18 @@ class Potcar(object):
                 msg = "Number of elements not same as potcar_strings"
                 raise ValueError(msg)
 
+    @staticmethod
+    def from_atoms(atoms=None, pot_type=None):
+        """Obtain POTCAR for atoms object."""
+        new_symb = []
+        for i in atoms.elements:
+            if i not in new_symb:
+                new_symb.append(i)
+        if pot_type is None:
+            pot_type = "POT_GGA_PAW_PBE"
+        potcar = Potcar(elements=new_symb, pot_type=pot_type)
+        return potcar
+
     @classmethod
     def from_dict(self, d={}):
         """Build class from a dictionary."""
@@ -529,6 +582,24 @@ def find_ldau_magmom(
     info["AMIX_MAG"] = amixmag
     info["BMIX_MAG"] = bmixmag
     return info
+
+
+def get_nelect(atoms=None, default_pot=None):
+    """Get number of electrons fro default POTCAR settings."""
+    if default_pot is None:
+        default_pot = loadjson(
+            os.path.join(
+                os.path.join(os.path.dirname(__file__)),
+                "..",
+                "wannier",
+                "default_semicore.json",
+            )
+        )
+    comp = atoms.composition.to_dict()
+    nelect = 0
+    for i, j in comp.items():
+        nelect = nelect + j * (default_pot[i][0] + default_pot[i][1])
+    return nelect
 
 
 def add_ldau_incar(
