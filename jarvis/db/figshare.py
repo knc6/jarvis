@@ -12,12 +12,13 @@ import io
 import json
 import requests
 from jarvis.db.jsonutils import loadjson
-from jarvis.io.vasp.outputs import Vasprun
-from jarvis.io.vasp.inputs import Poscar
-from jarvis.io.wannier.outputs import WannierHam
 from tqdm import tqdm
 import matplotlib.image as mpimg
-from jarvis.analysis.stm.tersoff_hamann import TersoffHamannSTM
+
+# from jarvis.analysis.stm.tersoff_hamann import TersoffHamannSTM
+# from jarvis.io.wannier.outputs import WannierHam
+# from jarvis.io.vasp.outputs import Vasprun
+# from jarvis.io.vasp.inputs import Poscar
 
 # import matplotlib.pyplot as plt
 # plt.switch_backend("agg")
@@ -79,7 +80,7 @@ def get_db_info():
             # "https://ndownloader.figshare.com/files/26809760",
             "id_prop.json",
             "Obtaining ALIGNN-FF training DB 300k ...",
-            "https://arxiv.org/abs/2209.05554",
+            "https://doi.org/10.1039/D2DD00096B",
         ],
         "mp_3d_2020": [
             "https://ndownloader.figshare.com/files/26791259",
@@ -327,7 +328,21 @@ def get_db_info():
             "https://figshare.com/ndownloader/files/40750811",
             "vacancydb.json",
             "Obtaining vacancy dataset 464...",
-            "https://arxiv.org/abs/2205.08366",
+            "https://doi.org/10.1063/5.0135382",
+        ],
+        # https://doi.org/10.6084/m9.figshare.25832614
+        "surfacedb": [
+            "https://figshare.com/ndownloader/files/46355689",
+            "surface_db_dd.json",
+            "Obtaining vacancy dataset 607...",
+            "https://doi.org/10.1039/D4DD00031E",
+        ],
+        # https://doi.org/10.6084/m9.figshare.25832614
+        "interfacedb": [
+            "https://figshare.com/ndownloader/files/46355692",
+            "interface_db_dd.json",
+            "Obtaining vacancy dataset 607...",
+            "https://doi.org/10.1039/D4DD00031E",
         ],
         # Contains repeats
         # https://doi.org/10.6084/m9.figshare.23206193
@@ -420,6 +435,69 @@ def get_db_info():
             "m3gnet_mpf.json",
             "Obtaining m3gnet_mpf dataset 168917...",
             "https://github.com/materialsvirtuallab/m3gnet",
+        ],
+        # https://doi.org/10.6084/m9.figshare.23267852
+        "m3gnet_mpf_1.5mil": [
+            "https://figshare.com/ndownloader/files/47281519",
+            "id_prop.json",
+            "Obtaining m3gnet_mpf dataset 1.5mil...",
+            "https://github.com/materialsvirtuallab/m3gnet",
+        ],
+        # https://doi.org/10.6084/m9.figshare.23531523
+        "mxene275": [
+            "https://figshare.com/ndownloader/files/41266233",
+            "mxene275.json",
+            "Obtaining mxene dataset 275...",
+            "https://cmr.fysik.dtu.dk/c2db/c2db.html",
+        ],
+        # https://doi.org/10.6084/m9.figshare.26117998
+        "cccbdb": [
+            "https://figshare.com/ndownloader/files/47283808",
+            "cccbdb.json",
+            "Obtaining CCCBDB dataset 1333...",
+            "https://cccbdb.nist.gov/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_pbe_hull": [
+            "https://figshare.com/ndownloader/files/49622718",
+            "alexandria_convex_hull_pbe_2023.12.29_jarvis_tools.json",
+            "Obtaining Alexandria_DB PBE on hull 116k...",
+            "https://alexandria.icams.rub.de/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_pbe_3d_all": [
+            "https://figshare.com/ndownloader/files/49622946",
+            "alexandria_pbe_3d_2024.10.1_jarvis_tools.json",
+            "Obtaining Alexandria_DB PBE 3D all 5 million, large file...",
+            "https://alexandria.icams.rub.de/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_pbe_2d_all": [
+            "https://figshare.com/ndownloader/files/49622988",
+            "alexandria_pbe_2d_2024.10.1_jarvis_tools.json",
+            "Obtaining Alexandria_DB PBE 2D all 200k...",
+            "https://alexandria.icams.rub.de/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_pbe_1d_all": [
+            "https://figshare.com/ndownloader/files/49622991",
+            "alexandria_pbe_1d_2024.10.1_jarvis_tools.json",
+            "Obtaining Alexandria_DB PBE 1D all 100k...",
+            "https://alexandria.icams.rub.de/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_scan_3d_all": [
+            "https://figshare.com/ndownloader/files/49623090",
+            "alexandria_scan_3d_2024.10.1_jarvis_tools.json",
+            "Obtaining Alexandria_DB SCAN 3D all 500k...",
+            "https://alexandria.icams.rub.de/",
+        ],
+        # https://doi.org/10.6084/m9.figshare.27174897
+        "alex_pbesol_3d_all": [
+            "https://figshare.com/ndownloader/files/49623096",
+            "alexandria_ps_3d_2024.10.1_jarvis_tools.json",
+            "Obtaining Alexandria_DB PBEsol 3D all 500k...",
+            "https://alexandria.icams.rub.de/",
         ],
         # https://doi.org/10.6084/m9.figshare.13154159
         "raw_files": [
@@ -577,6 +655,8 @@ def make_stm_from_prev_parchg(
     jid="JVASP-667", bias="Negative", filename="stm_image.png", min_size=10
 ):
     """Make STM images from previously calculated PARVHG files for 2D."""
+    from jarvis.analysis.stm.tersoff_hamann import TersoffHamannSTM
+
     fls = data("raw_files")
     for i in fls["STM"]:
         zip_name = jid + "_" + bias + ".zip"
@@ -598,6 +678,9 @@ def make_stm_from_prev_parchg(
 
 def get_wann_electron(jid="JVASP-816"):
     """Download electron WTBH if available."""
+    from jarvis.io.wannier.outputs import WannierHam
+    from jarvis.io.vasp.inputs import Poscar
+
     w = ""
     ef = ""
     fls = data("raw_files")
@@ -629,6 +712,8 @@ def get_wann_phonon(jid="JVASP-1002", factor=15.633302):
     """Download phonon WTBH if available."""
     # Requires phonopy
     from jarvis.io.phonopy.outputs import get_phonon_tb
+    from jarvis.io.vasp.outputs import Vasprun
+    from jarvis.io.wannier.outputs import WannierHam
 
     fls = data("raw_files")
 

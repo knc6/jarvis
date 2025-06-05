@@ -23,6 +23,7 @@ from collections import defaultdict
 from sklearn.metrics import mean_absolute_error
 import zipfile
 import json
+from math import cos, pi, sin
 
 amu_gm = 1.66054e-24
 ang_cm = 1e-8
@@ -867,6 +868,128 @@ class Atoms(object):
             pass
         return rcut1, rcut2, neighbors
 
+    def rotate_pos(self, phi=0.0, theta=90.0, psi=0.0, center=(0, 0, 0)):
+        """Rotate atom sites via Euler angles (in degrees).
+
+        See e.g http://mathworld.wolfram.com/EulerAngles.html for explanation.
+        Adapted from
+        https://wiki.fysik.dtu.dk/ase/_modules/ase/atoms.html#Atoms.rotate
+        center :
+            The point to rotate about. A sequence of length 3 with the
+            coordinates.
+        phi :
+            The 1st rotation angle around the z axis.
+        theta :
+            Rotation around the x axis.
+        psi :
+            2nd rotation around the z axis.
+
+        """
+        phi *= pi / 180
+        theta *= pi / 180
+        psi *= pi / 180
+
+        rcoords = self.cart_coords - center
+        D = np.array(
+            (
+                (cos(phi), sin(phi), 0.0),
+                (-sin(phi), cos(phi), 0.0),
+                (0.0, 0.0, 1.0),
+            )
+        )
+        # Second Euler rotation about x:
+        C = np.array(
+            (
+                (1.0, 0.0, 0.0),
+                (0.0, cos(theta), sin(theta)),
+                (0.0, -sin(theta), cos(theta)),
+            )
+        )
+        # Third Euler rotation, 2nd rotation about z:
+        B = np.array(
+            (
+                (cos(psi), sin(psi), 0.0),
+                (-sin(psi), cos(psi), 0.0),
+                (0.0, 0.0, 1.0),
+            )
+        )
+        # Total Euler rotation
+        A = np.dot(B, np.dot(C, D))
+        # Do the rotation
+        rcoords = np.dot(A, np.transpose(rcoords))
+        positions = np.transpose(rcoords) + center
+
+        return Atoms(
+            lattice_mat=self.lattice_mat,
+            elements=self.elements,
+            coords=positions,
+            cartesian=True,
+            props=self.props,
+        )
+
+    def rotate_cell(self, phi=0.0, theta=90.0, psi=0.0, center=(0, 0, 0)):
+        """Rotate atom cell via Euler angles (in degrees).
+
+        See e.g http://mathworld.wolfram.com/EulerAngles.html for explanation.
+        Adapted from
+        https://wiki.fysik.dtu.dk/ase/_modules/ase/atoms.html#Atoms.rotate
+        center :
+            The point to rotate about. A sequence of length 3 with the
+            coordinates.
+        phi :
+            The 1st rotation angle around the z axis.
+        theta :
+            Rotation around the x axis.
+        psi :
+            2nd rotation around the z axis.
+
+        """
+        phi *= pi / 180
+        theta *= pi / 180
+        psi *= pi / 180
+
+        # First move the molecule to the origin In contrast to MATLAB,
+        # numpy broadcasts the smaller array to the larger row-wise,
+        # so there is no need to play with the Kronecker product.
+        # rcoords = atoms.cart_coords - center
+        # First Euler rotation about z in matrix form
+        D = np.array(
+            (
+                (cos(phi), sin(phi), 0.0),
+                (-sin(phi), cos(phi), 0.0),
+                (0.0, 0.0, 1.0),
+            )
+        )
+        # Second Euler rotation about x:
+        C = np.array(
+            (
+                (1.0, 0.0, 0.0),
+                (0.0, cos(theta), sin(theta)),
+                (0.0, -sin(theta), cos(theta)),
+            )
+        )
+        # Third Euler rotation, 2nd rotation about z:
+        B = np.array(
+            (
+                (cos(psi), sin(psi), 0.0),
+                (-sin(psi), cos(psi), 0.0),
+                (0.0, 0.0, 1.0),
+            )
+        )
+        # Total Euler rotation
+        A = np.dot(B, np.dot(C, D))
+        # Do the rotation
+        r_lattice_mat = np.dot(A, self.lattice_mat)
+        # Move back to the roactation point
+        # positions = np.transpose(rcoords) + center
+        return Atoms(
+            lattice_mat=r_lattice_mat,
+            elements=self.elements,
+            coords=self.frac_coords,
+            cartesian=False,
+            props=self.props,
+        )
+
     def atomwise_angle_and_radial_distribution(
         self, r=5, bond_tol=0.15, c_size=10, verbose=False
     ):
@@ -1315,6 +1438,9 @@ class Atoms(object):
 
         from alignn.graphs import Graph
         from alignn.pretrained import get_figshare_model
+        import torch
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         g, lg = Graph.atom_dgl_multigraph(
             self,
@@ -1329,12 +1455,15 @@ class Atoms(object):
             model = get_figshare_model(
                 model_name="jv_formation_energy_peratom_alignn"
             )
+        g.to(device)
+        lg.to(device)
         h = get_val(model, g, lg)
         return h
 
     def get_mineral_prototype_name(
         self, prim=True, include_c_over_a=False, digits=3
     ):
+        """Get mineral_prototype_name."""
         from jarvis.analysis.structure.spacegroup import Spacegroup3D
 
         spg = Spacegroup3D(self)
@@ -1447,11 +1576,15 @@ class Atoms(object):
         cutoff=4,
         take_n_bonds=2,
         include_spg=True,
+        include_mineral_name=False,
     ):
         """Describe for NLP applications."""
         from jarvis.analysis.diffraction.xrd import XRD
 
-        min_name = self.get_minaral_name()
+        if include_mineral_name:
+            min_name = self.get_minaral_name()
+        else:
+            min_name = "na"
         if include_spg:
             from jarvis.analysis.structure.spacegroup import Spacegroup3D
 
@@ -1524,9 +1657,9 @@ class Atoms(object):
                 list(set(spg._dataset["wyckoffs"]))
             )
             struct_info["natoms_primitive"] = spg.primitive_atoms.num_atoms
-            struct_info[
-                "natoms_conventional"
-            ] = spg.conventional_standard_structure.num_atoms
+            struct_info["natoms_conventional"] = (
+                spg.conventional_standard_structure.num_atoms
+            )
         info["chemical_info"] = chem_info
         info["structure_info"] = struct_info
         line = "The number of atoms are: " + str(
@@ -1589,7 +1722,8 @@ class Atoms(object):
             + struct_info["wyckoff"]
             + "."
         )
-        if min_name is not None:
+        if min_name != "na":
+            # if min_name is not None:
             line3 = (
                 chem_info["atomic_formula"]
                 + " is "
@@ -1652,16 +1786,19 @@ class Atoms(object):
 
         new_sites = []
         new_elements = []
-        for site, el in zip(self.cart_coords, self.elements):
+        new_props = []
+        for site, el, p in zip(self.cart_coords, self.elements, self.props):
             for v in c_lat:
                 new_elements.append(el)
                 tmp = site + v
                 new_sites.append(tmp)
+                new_props.append(p)
         return Atoms(
             lattice_mat=new_lattice.lattice(),
             elements=new_elements,
             coords=new_sites,
             cartesian=True,
+            props=new_props,
         )
 
     def make_supercell(self, dim=[2, 2, 2]):
@@ -2276,18 +2413,18 @@ class OptimadeAdaptor(object):
         info_at["cartesian_site_positions"] = atoms.cart_coords[order].tolist()
         info_at["nperiodic_dimensions"] = 3
         # info_at["species"] = atoms.elements
-        info_at[
-            "species"
-        ] = self.get_optimade_species()  # dict(atoms.composition.to_dict())
+        info_at["species"] = (
+            self.get_optimade_species()
+        )  # dict(atoms.composition.to_dict())
         info_at["elements_ratios"] = list(
             atoms.composition.atomic_fraction.values()
         )
         info_at["structure_features"] = []
         info_at["last_modified"] = str(now)
         # info_at["more_data_available"] = True
-        info_at[
-            "chemical_formula_descriptive"
-        ] = atoms.composition.reduced_formula
+        info_at["chemical_formula_descriptive"] = (
+            atoms.composition.reduced_formula
+        )
         info_at["dimension_types"] = [1, 1, 1]
         info["attributes"] = info_at
         return info
